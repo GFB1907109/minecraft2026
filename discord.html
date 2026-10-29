@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Discord · Minecraft 2026</title>
+<meta name="description" content="Der Discord-Server von Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="discord">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Discord</span><h1>Unser Discord</h1><p class="lead">Hier wird geredet, geplant und gelacht. Live sieht man, wer gerade online ist und wer in welchem Sprachkanal sitzt.</p></div></section><section class="block-sec"><div class="wrap"><div class="panel" style="border-color:#5865f2"><h3 class="sub">Beitreten</h3><div id="dJoin"></div></div></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Live</span><h2>Wer ist gerade im Discord?</h2></div></div><div id="dLive"></div></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Kanäle</span><h2>Was ist wo?</h2></div></div><div class="info">
+    <dl><dt>📢 ankündigungen</dt><dd style="font-family:var(--f-body)">Updates, Neustarts, neue Staffel</dd></dl>
+    <dl><dt>📌 server-info</dt><dd style="font-family:var(--f-body)">IP, Version, Regeln, Website</dd></dl>
+    <dl><dt>💬 mc-chat</dt><dd style="font-family:var(--f-body)">Alles rund ums Spiel</dd></dl>
+    <dl><dt>📸 screenshots</dt><dd style="font-family:var(--f-body)">Bilder eurer Bauten</dd></dl>
+    <dl><dt>🏗️ projekte</dt><dd style="font-family:var(--f-body)">Bauprojekte planen, Koordinaten teilen</dd></dl>
+    <dl><dt>📅 events</dt><dd style="font-family:var(--f-body)">Termine absprechen</dd></dl>
+    <dl><dt>🔊 Minecraft-Talk</dt><dd style="font-family:var(--f-body)">Zusammen zocken und reden</dd></dl>
+  </div><details class="panel" style="margin-top:28px"><summary style="cursor:pointer;font-weight:700">Für Admins: Discord mit der Website verbinden</summary>
+<ol class="muted" style="margin:12px 0 0;padding-left:1.2em;display:grid;gap:6px">
+<li>In Discord: Rechtsklick auf den Servernamen → <b>Servereinstellungen</b> → <b>Widget</b>.</li>
+<li><b>Server-Widget aktivieren</b> einschalten und die <b>Server-ID</b> kopieren.</li>
+<li>Darunter bei <b>Einladungskanal</b> einen Kanal wählen.</li>
+<li>Einen Einladungslink erstellen: Rechtsklick auf den Server → <b>Leute einladen</b> → <b>Einladungslink bearbeiten</b> → „Läuft ab: Nie“.</li>
+<li>Auf GitHub die Datei <code>assets/app.js</code> öffnen, Stift klicken und ganz oben bei <code>discord</code> den Link und die Server-ID eintragen. <b>Commit changes</b>.</li>
+</ol></details></div></section>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

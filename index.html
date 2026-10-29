@@ -30,14 +30,22 @@
   </div>
 </section>
 <div class="ticker" aria-hidden="true"><div id="tickerInner"></div></div>
-<section class="block-sec" id="live"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Live</span><h2>Was geht auf dem Server?</h2><p class="lead">Online-Status alle 30 Sekunden frisch. Alles andere kommt alle 15 Minuten direkt vom Server.</p></div></div><div class="tiles" id="tiles"></div><div class="worldbar" id="worldbar"></div><p class="updated" id="updated" style="margin:12px 0 0"></p></div></section>
+<section class="block-sec" id="live"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Live</span><h2>Was geht auf dem Server?</h2><p class="lead">Online-Status alle 30 Sekunden, alles andere etwa alle 5 Minuten direkt vom Server.</p></div></div>
+<div class="live-grid">
+  <div class="panel live-now">
+    <div class="live-count"><span class="big" id="onCount">–</span><span><b>gerade online</b><br><span class="small muted" id="onMax">wird geprüft …</span></span></div>
+    <div id="onlineNow"></div>
+    <p class="updated" id="updated" style="margin:0"></p>
+  </div>
+  <div class="panel live-world">
+    <h3 class="sub">Die Welt <span class="small muted" style="font:500 .8rem var(--f-body)">beim letzten Abgleich</span></h3>
+    <div class="world-list" id="worldList"></div>
+  </div>
+</div>
+<div class="stat-groups" id="statGroups"></div></div></section>
 <section class="block-sec"><div class="wrap"><div class="start-grid">
-  <div class="panel"><h3 class="sub">Gerade online <a href="aktivitaet.html">Aktivität →</a></h3><div id="onlineNow"></div></div>
   <div class="panel"><h3 class="sub">Spieler der Woche <a href="stats.html">Stats →</a></h3><div id="potw"></div></div>
-  <div class="panel"><h3 class="sub">Nächstes Event <a href="events.html">Alle →</a></h3><div id="nextEvent"></div></div>
-</div></div></section>
-<section class="block-sec"><div class="wrap"><div class="two">
-  <div class="panel"><h3 class="sub">Letzte Tode <a href="tode.html">Alle Tode →</a></h3><div class="feed" id="startDeaths"></div></div>
+  <div class="panel"><h3 class="sub">Letzte Tode <a href="tode.html">Alle →</a></h3><div class="feed" id="startDeaths"></div></div>
   <div class="panel"><h3 class="sub">Bingo dieser Woche <a href="bingo.html">Zum Bingo →</a></h3><div id="startBingo"></div></div>
 </div></div></section>
 <section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Rekorde</span><h2>Die Spitzenreiter</h2></div><a class="more-link" href="stats.html">Alle Bestenlisten →</a></div><div class="records" id="startRecords"></div></div></section>

@@ -373,11 +373,26 @@ try {
     } catch (e) { console.warn("Deutsche Fortschritt-Namen nicht geladen:", e.message); }
   }
 
+  // Aktuelle Skins direkt von Mojang (pro Spieler höchstens alle 20 Minuten neu abfragen)
+  const skins = { ...(old?.skins || {}) };
+  for (const p of players) {
+    const prev = skins[p.uuid];
+    if (prev && Date.now() - new Date(prev.at) < 20 * 60 * 1000) continue;
+    try {
+      const r = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${p.uuid.replace(/-/g, "")}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const prof = await r.json();
+      const tex = JSON.parse(Buffer.from(prof.properties.find(x => x.name === "textures").value, "base64").toString("utf8"));
+      const url = tex.textures?.SKIN?.url || null;
+      skins[p.uuid] = { tex: url ? url.split("/").pop() : null, slim: tex.textures?.SKIN?.metadata?.model === "slim" || undefined, name: prof.name, at: new Date().toISOString() };
+    } catch (e) { console.warn("Skin nicht geladen:", p.name, e.message); }
+  }
+
   // Mod-Liste
   const mods = ((await tryList(client, `${root}/mods`)) || []).filter(f => f.isFile && f.name.endsWith(".jar")).map(f => f.name).sort();
 
-  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, advNames, mods };
-  const strip = o => JSON.stringify(o);
+  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, advNames, mods, skins };
+  const strip = o => JSON.stringify(o, (k, v) => k === "at" ? undefined : v);
   if (old && strip({ ...old, updated: undefined }) === strip({ ...out, updated: undefined })) {
     console.log("Keine Änderungen seit dem letzten Lauf.");
   } else {

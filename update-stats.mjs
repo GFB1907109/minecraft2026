@@ -138,7 +138,24 @@ function worldInfo(sources) {
 }
 
 /* ---------- Server-Logs ---------- */
-const LINE = /^\[(\d{2}:\d{2}:\d{2})\] \[[^\]]*\](?: \[[^\]]*\])?(?:: | \([^)]*\) )(.*)$/;
+// Erkennt viele Log-Formate, z. B.
+// [21:20:01] [Server thread/INFO]: Text
+// [21:20:01] [Server thread/INFO] (Minecraft) Text
+// [29Oct2026 21:20:01.123] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: Text
+// [21:20:01 INFO]: Text      ·      2026-10-29 21:20:01 [INFO] Text
+function splitLine(line) {
+  const tm = line.slice(0, 48).match(/(\d{1,2}):(\d{2}):(\d{2})/);
+  if (!tm) return null;
+  const hms = `${tm[1].padStart(2, "0")}:${tm[2]}:${tm[3]}`;
+  const rest = line.slice(tm.index + tm[0].length);
+  let msg = null;
+  const a = rest.match(/^[^\n]*?\]:\s(.*)$/);              // ...]: Text
+  const b = rest.match(/^[^\n]*?\]\s\([^)]*\)\s(.*)$/);   // ...] (Minecraft) Text
+  const c = rest.match(/^[^\n]*?\[(?:INFO|WARN)\]:?\s(.*)$/);
+  if (b && (!a || b[1].length > a[1].length)) msg = b[1]; else if (a) msg = a[1]; else if (c) msg = c[1];
+  if (msg == null) return null;
+  return { hms, msg: msg.replace(/\u001b\[[0-9;]*m/g, "").replace(/§./g, "").trim() };
+}
 const NAME = "[A-Za-z0-9_]{2,16}";
 const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
@@ -146,11 +163,11 @@ function parseLog(text, names, { start, end }) {
   const rows = [];
   let wraps = 0, prev = "";
   for (const line of text.split(/\r?\n/)) {
-    const m = line.match(LINE);
+    const m = splitLine(line);
     if (!m) continue;
-    if (prev && m[1] < prev) wraps++;
-    prev = m[1];
-    rows.push([wraps, m[1], m[2]]);
+    if (prev && m.hms < prev) wraps++;
+    prev = m.hms;
+    rows.push([wraps, m.hms, m.msg]);
   }
   const day0 = start || addDays(end, -wraps);
   const ev = [];
@@ -261,6 +278,8 @@ try {
   // Logs
   const log = { processed: [], archive: [], current: [], ...(old?.log || {}) };
   const logs = (await tryList(client, `${root}/logs`)) || [];
+  console.log("Log-Dateien:", logs.map(f => f.name).slice(-10).join(", ") || "keine gefunden in " + root + "/logs");
+  console.log("Bekannte Spieler:", [...nameSet].join(", ") || "keine (usercache.json fehlt?)");
   const gz = logs.filter(f => /^\d{4}-\d{2}-\d{2}-\d+\.log\.gz$/.test(f.name) && !log.processed.includes(f.name))
     .sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
   for (const f of gz) {
@@ -273,7 +292,11 @@ try {
   if (logs.some(f => f.name === "latest.log")) {
     let end = berlinDate();
     try { end = berlinDate(await client.lastMod(`${root}/logs/latest.log`)); } catch {}
-    log.current = parseLog(await readText(client, `${root}/logs/latest.log`), nameSet, { end });
+    const latest = await readText(client, `${root}/logs/latest.log`);
+    log.current = parseLog(latest, nameSet, { end });
+    const sample = latest.split(/\r?\n/).filter(l => /joined the game|left the game|<|was |fell |drowned|died/.test(l)).slice(-5);
+    console.log("Beispielzeilen aus latest.log:\n" + (sample.length ? sample.join("\n") : latest.split(/\r?\n/).slice(0, 5).join("\n")));
+    console.log("Erkannt in latest.log:", ["j","l","c","d"].map(t => `${t}=${log.current.filter(e => e[1] === t).length}`).join(" "));
   }
   if (SHOW_CHAT !== "true") { log.archive = log.archive.filter(e => e[1] !== "c"); log.current = log.current.filter(e => e[1] !== "c"); }
   // Begrenzen: Tode komplett (max. 3000), Chat die letzten 500, Join/Leave die letzten 4000

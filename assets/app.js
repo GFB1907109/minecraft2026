@@ -87,9 +87,13 @@ const profileOf = name => { const p = playerBy(name); return p ? App.stats.profi
 
 async function loadStats(){
   try {
-    const r = await fetch("stats.json", { cache: "no-store" });
-    if (!r.ok) return;
-    const s = await r.json();
+    // Zuerst direkt von GitHub (sofort aktuell), sonst die Kopie der Website
+    let s = null;
+    try {
+      const r = await fetch(`https://api.github.com/repos/${CONFIG.github}/contents/stats.json`, { cache: "no-store", headers: { Accept: "application/vnd.github.raw" } });
+      if (r.ok) s = await r.json();
+    } catch {}
+    if (!s) { const r = await fetch("stats.json", { cache: "no-store" }); if (!r.ok) return; s = await r.json(); }
     App.stats = s;
     App.events = s?.log ? [...(s.log.archive || []), ...(s.log.current || [])].sort((a,b) => a[0].localeCompare(b[0])) : [];
     emit();
@@ -845,4 +849,4 @@ PAGE_INIT[document.body.dataset.page]?.();
 loadStats();
 refreshLive();
 setInterval(refreshLive, CONFIG.refreshSeconds * 1000);
-setInterval(loadStats, 2 * 60 * 1000);
+setInterval(loadStats, 90 * 1000);

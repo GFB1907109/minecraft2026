@@ -22,7 +22,7 @@ const CONFIG = {
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["karte.html", "Karte", 1], ["bingo.html", "Bingo", 1], ["events.html", "Events", 1], ["discord.html", "Discord", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["karte.html", "Karte", 1], ["bingo.html", "Bingo", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
@@ -610,18 +610,9 @@ const PAGE_INIT = {
       setTimeout(() => $("copyBtn").textContent = "IP kopieren", 1800);
     });
     if (CONFIG.discord?.invite) $("statusPill").insertAdjacentHTML("afterend", `<a class="pill" href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener" style="text-decoration:none;border-color:#5865f2">Discord beitreten →</a>`);
-    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Karte", "Wochen-Bingo", "Todes-Feed", "Events", "Discord", addr];
+    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Karte", "Wochen-Bingo", "Todes-Feed", "Discord", addr];
     const run = items.map(t => `<span>${esc(t)}</span><span>✦</span>`).join("");
     set("tickerInner", run + run);
-    let events = [];
-    loadContent("events").then(e => { events = e; renderEvent(); });
-    function renderEvent(){
-      const now = new Date();
-      const next = events.map(e => ({ ...e, d: new Date(String(e.datum).replace(" ", "T")) })).filter(e => e.d > now - 3 * 36e5).sort((a,b) => a.d - b.d)[0];
-      set("nextEvent", next ? `<div class="next-event"><span class="ttl">${esc(next.titel)}</span><span class="muted">${next.d.toLocaleString("de-DE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} Uhr${next.ort ? " · " + esc(next.ort) : ""}</span><span class="countdown">${countdown(next.d)}</span></div>`
-        : `<p class="muted" style="margin:0">Gerade ist nichts geplant. Neue Events tragt ihr in <code>content/events.json</code> ein.</p>`);
-    }
-    setInterval(renderEvent, 1000);
     onUpdate(() => {
       liveStatusInto();
       set("tiles", tilesHtml()); set("worldbar", worldHtml());
@@ -633,6 +624,9 @@ const PAGE_INIT = {
         <div class="muted">${H(weekDelta(best,"play"))} diese Woche gespielt</div><div class="small muted">${N(weekDelta(best,"mined"))} Blöcke · ${N(weekDelta(best,"mobs"))} Mobs · ${N(weekDelta(best,"deaths"))} Tode</div></div></div>`
         : `<p class="muted" style="margin:0">Diese Woche hat noch niemand gespielt.</p>`);
       deathFeedInto("startDeaths", 5);
+      const advs = []; for (const p of ps) for (const [id, t] of advDone(p)) advs.push({ p: p.name, id, t: t || "" });
+      advs.sort((a, b) => b.t.localeCompare(a.t));
+      set("nextEvent", advs.length ? `<div class="feed">${advs.slice(0, 4).map(a => `<div class="fi" style="grid-template-columns:minmax(0,1fr) auto"><span class="tx"><b>${esc(a.p)}</b> · ${esc(advName(a.id))}</span><span class="tm">${a.t ? when(a.t) : ""}</span></div>`).join("")}</div>` : `<p class="muted" style="margin:0">Noch keine Fortschritte erfasst.</p>`);
       recordsInto("startRecords", 6);
       const ch = App.stats?.challenges || [];
       set("startBingo", ch.length && ps.length ? `<div class="feed">${ch.slice(0, 9).map(c => { const who = ps.filter(p => bingoProgress(p, c) >= c.target);
@@ -810,6 +804,39 @@ const PAGE_INIT = {
             <ol>${top.map(p => `<li>${esc(p.name)} · ${H(p.play||0)}</li>`).join("")}</ol><a class="btn" style="display:inline-block;margin-top:12px" href="stats.html">Zu den Bestenlisten</a></div>`; }).join("") ||
         empty("Noch keine Daten."));
     });
+  },
+
+  fussball(){
+    async function load(){
+      let f = null;
+      try { const r = await fetch(`https://api.github.com/repos/${CONFIG.github}/contents/football.json`, { cache: "no-store", headers: { Accept: "application/vnd.github.raw" } }); if (r.ok) f = await r.json(); } catch {}
+      if (!f) { try { const r = await fetch("football.json", { cache: "no-store" }); if (r.ok) f = await r.json(); } catch {} }
+      if (!f?.teams?.length) { set("fbTeams", empty("Die Fußball-Daten kommen mit dem nächsten Abgleich.", "Spätestens in 20 Minuten stehen hier Ergebnisse, nächste Spiele und Tabellen.")); return; }
+      const d = s => new Date(s);
+      const dt = s => d(s).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      const chip = r => `<span class="res res-${r}">${r}</span>`;
+      set("fbUpdated", `Stand: ${d(f.updated).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}`);
+      set("fbTeams", f.teams.map(t => {
+        const next = t.upcoming?.[0];
+        const tbl = t.table || [], i = tbl.findIndex(x => x.us);
+        const rows = i < 0 ? tbl.slice(0, 6) : tbl.filter((x, k) => k < 3 || Math.abs(k - i) <= 2);
+        return `<section class="fb-team fb-${t.key}">
+          <div class="fb-head"><span class="eyebrow">${esc(t.league)}</span><h2>${esc(t.name)}</h2>
+            <div class="form">${(t.results || []).slice(0, 5).map(g => chip(g.res || "?")).join("")}<span class="small muted">letzte Spiele</span></div></div>
+          ${next ? `<div class="fb-next"><span class="small muted">Nächstes Spiel${next.comp ? " · " + esc(next.comp) : ""}</span>
+            <div class="fb-match"><b>${esc(next.home)}</b><span class="vs">${next.live ? `${esc(next.hs)}:${esc(next.as)}` : "vs"}</span><b>${esc(next.away)}</b></div>
+            <span class="fb-when">${next.live ? `<span class="res res-L">LIVE</span> ${esc(next.status)}` : `${dt(next.date)} Uhr · <span class="countdown" data-at="${esc(next.date)}"></span>`}</span></div>` : `<p class="muted">Kein Spiel angesetzt.</p>`}
+          <h3 class="sub" style="margin-top:18px">Ergebnisse</h3>
+          <div class="feed">${(t.results || []).map(g => `<div class="fi" style="grid-template-columns:auto minmax(0,1fr) auto">${chip(g.res || "?")}<span class="tx">${esc(g.home)} <b>${esc(g.hs ?? "–")}:${esc(g.as ?? "–")}</b> ${esc(g.away)}</span><span class="tm">${d(g.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span></div>`).join("") || `<p class="muted small">Noch keine Ergebnisse.</p>`}</div>
+          ${(t.upcoming || []).length > 1 ? `<h3 class="sub" style="margin-top:18px">Nächste Spiele</h3><div class="feed">${t.upcoming.slice(1).map(g => `<div class="fi" style="grid-template-columns:minmax(0,1fr) auto"><span class="tx">${esc(g.home)} – ${esc(g.away)}</span><span class="tm">${dt(g.date)}</span></div>`).join("")}</div>` : ""}
+          ${tbl.length ? `<h3 class="sub" style="margin-top:18px">Tabelle</h3><div class="cmp-wrap"><table class="cmp fb-table"><thead><tr><th>#</th><th style="text-align:left">Verein</th><th>Sp</th><th>Diff</th><th>Pkt</th></tr></thead><tbody>
+            ${rows.map((x, k) => `${k > 0 && (x.rank ?? 0) - (rows[k-1].rank ?? 0) > 1 ? `<tr><td colspan="5" style="text-align:center;color:var(--muted)">…</td></tr>` : ""}<tr class="${x.us ? "us" : ""}"><td>${x.rank ?? ""}</td><td style="text-align:left">${esc(x.team)}</td><td>${x.played ?? ""}</td><td>${x.diff ?? ""}</td><td><b>${x.points ?? ""}</b></td></tr>`).join("")}</tbody></table></div>` : ""}
+        </section>`;
+      }).join(""));
+      tick();
+    }
+    function tick(){ document.querySelectorAll(".countdown[data-at]").forEach(el => el.textContent = countdown(new Date(el.dataset.at))); }
+    load(); setInterval(load, 5 * 60 * 1000); setInterval(tick, 1000);
   },
 
   discord(){

@@ -1,0 +1,52 @@
+name: Welt hochladen
+
+on:
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: welt
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: node download-world.mjs
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+      - name: Karte rendern
+        run: node render-map.mjs download map
+      - name: Karte speichern
+        run: |
+          git config user.name "stats-bot"
+          git config user.email "stats-bot@users.noreply.github.com"
+          git add map
+          git diff --cached --quiet || git commit -m "Karte aktualisiert"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done
+      - name: Welt einpacken und veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATUM=$(TZ=Europe/Berlin date +%Y-%m-%d)
+          ANZEIGE=$(TZ=Europe/Berlin date +%d.%m.%Y)
+          ZIP="Minecraft-2026-Welt-$DATUM.zip"
+          (cd download && zip -rq "../$ZIP" .)
+          TAG="welt-$DATUM-$(date +%H%M)"
+          gh release create "$TAG" "$ZIP" --title "Welt vom $ANZEIGE" --notes "Automatische Sicherung der Welt vom $ANZEIGE."
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^welt-' | tail -n +9 | while read t; do
+            gh release delete "$t" --yes --cleanup-tag
+          done

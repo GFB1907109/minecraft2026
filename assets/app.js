@@ -292,7 +292,8 @@ const badgeHtml = b => `<span class="badge${b.has ? "" : " locked"}" title="${es
 /* ---------- Fortschritte ---------- */
 const ADV_CAT = { story: "Minecraft", nether: "Nether", end: "Das Ende", adventure: "Abenteuer", husbandry: "Landwirtschaft" };
 const advDone = p => (App.stats?.adv?.[p.uuid] || []).filter(([id]) => !id.endsWith("/root"));
-const advName = id => id.split("/").pop().split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const advName = id => App.stats?.advNames?.[id]?.t || id.split("/").pop().split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const advDesc = id => App.stats?.advNames?.[id]?.d || "";
 const advCat = id => ADV_CAT[id.split("/")[0]] || id.split("/")[0];
 
 /* ---------- Gemeinsame Bausteine ---------- */
@@ -687,7 +688,7 @@ const PAGE_INIT = {
       set("pStats", GROUPS.map(g => `<div><h4>${g}</h4><div class="kv">` + STATS.filter(s => s.g === g).map(s => { const r = rankOf(p, s.key);
         return `<div><span>${s.label}</span><b>${s.fmt(val(p,s.key))}${r === 1 && val(p,s.key) > 0 ? " <small>#1</small>" : ""}</b></div>`; }).join("") + `</div></div>`).join(""));
       const adv = advDone(p).slice().reverse();
-      set("pAdv", adv.length ? `<p class="muted small" style="margin:0 0 8px">${adv.length} Fortschritte geschafft</p><div class="adv-list">${adv.slice(0, 12).map(([id, t]) => `<div class="adv"><div><div class="cat">${advCat(id)}</div><div class="nm">${esc(advName(id))}</div></div><span class="tm small muted">${t ? when(t) : ""}</span></div>`).join("")}</div>` : `<p class="muted small">Noch keine Fortschritte erfasst.</p>`);
+      set("pAdv", adv.length ? `<p class="muted small" style="margin:0 0 8px">${adv.length} Fortschritte geschafft</p><div class="adv-list">${adv.slice(0, 12).map(([id, t]) => `<div class="adv"><div><div class="cat">${advCat(id)}</div><div class="nm">${esc(advName(id))}</div>${advDesc(id) ? `<div class="small muted">${esc(advDesc(id))}</div>` : ""}</div><span class="tm small muted">${t ? when(t) : ""}</span></div>`).join("")}</div>` : `<p class="muted small">Noch keine Fortschritte erfasst.</p>`);
       const sorted = [...players()].sort((a,b) => a.name.localeCompare(b.name)), i = sorted.indexOf(p);
       set("pNav", sorted.length > 1 ? `<a class="more-link" href="${plink(sorted[(i - 1 + sorted.length) % sorted.length].name)}">← ${esc(sorted[(i - 1 + sorted.length) % sorted.length].name)}</a><a class="more-link" href="${plink(sorted[(i + 1) % sorted.length].name)}">${esc(sorted[(i + 1) % sorted.length].name)} →</a>` : "");
     });
@@ -796,13 +797,16 @@ const PAGE_INIT = {
         const who = ps.filter(p => badgesOf(p).find(b => b.id === id).has);
         return `<div class="adv"><div style="display:flex;gap:12px;align-items:center">${badgeHtml({ name, desc, color, has: who.length > 0 })}</div><div class="who">${who.map(p => `<a href="${plink(p.name)}" title="${esc(p.name)}"><img alt="${esc(p.name)}" src="${head(p.name)}"></a>`).join("") || `<span class="small muted">noch niemand</span>`}</div></div>`;
       }).join("") : empty("Noch keine Spieler."));
+      const recent = []; for (const p of ps) for (const [id, t] of advDone(p)) recent.push({ p: p.name, id, t: t || "" });
+      recent.sort((a, b) => b.t.localeCompare(a.t));
+      set("advRecent", recent.length ? recent.slice(0, 25).map(r => `<div class="fi"><img alt="" loading="lazy" src="${head(r.p)}"><span class="tx"><a href="${plink(r.p)}" style="text-decoration:none"><b>${esc(r.p)}</b></a> hat <b style="color:var(--gold)">${esc(advName(r.id))}</b> geschafft<br><span class="small muted">${esc(advCat(r.id))}${advDesc(r.id) ? " · " + esc(advDesc(r.id)) : ""}</span></span><span class="tm">${r.t ? when(r.t) : ""}</span></div>`).join("") : empty("Noch keine Fortschritte erfasst.", "Kommt mit dem nächsten Abgleich."));
       const rank = ps.map(p => [p, advDone(p).length]).sort((a,b) => b[1] - a[1]);
       set("advRank", rank.length ? rank.map(([p, n], i) => `<a class="row" href="${plink(p.name)}" style="text-decoration:none"><span class="rk">${i+1}</span><img alt="" src="${head(p.name)}"><div class="nm">${esc(p.name)}</div><span class="val">${n}</span></a>`).join("") : `<p class="muted small">Noch keine Daten.</p>`);
       const all = {};
       for (const p of ps) for (const [id, t] of advDone(p)) (all[id] ||= []).push([p.name, t]);
       const ids = Object.keys(all).sort((a,b) => { const ta = all[a].map(x => x[1]).sort().pop() || "", tb = all[b].map(x => x[1]).sort().pop() || ""; return tb.localeCompare(ta); });
       set("advAll", ids.length ? ids.map(id => { const who = all[id].sort((a,b) => String(a[1]).localeCompare(String(b[1])));
-        return `<div class="adv"><div><div class="cat">${advCat(id)}</div><div class="nm">${esc(advName(id))}</div><div class="small muted">Zuerst: ${esc(who[0][0])}${who[0][1] ? " · " + when(who[0][1]) : ""}</div></div>
+        return `<div class="adv"><div><div class="cat">${advCat(id)}</div><div class="nm">${esc(advName(id))}</div>${advDesc(id) ? `<div class="small muted">${esc(advDesc(id))}</div>` : ""}<div class="small muted">Zuerst: ${esc(who[0][0])}${who[0][1] ? " · " + when(who[0][1]) : ""}</div></div>
           <div class="who">${who.map(([n], i) => `<a href="${plink(n)}" title="${esc(n)}"><img class="${i === 0 ? "first" : ""}" alt="${esc(n)}" src="${head(n)}"></a>`).join("")}</div></div>`; }).join("")
         : empty("Noch keine Fortschritte erfasst.", "Kommt mit dem nächsten Abgleich."));
     });

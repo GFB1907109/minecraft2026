@@ -350,10 +350,33 @@ try {
   }
   console.log(`Advancements: ${Object.keys(adv).length} Spieler`);
 
+  // Deutsche Namen der Fortschritte aus der offiziellen Sprachdatei von Mojang (nur wenn nötig neu laden)
+  let advNames = old?.advNames || null;
+  const wantVer = worldData.version || null;
+  if (!advNames || advNames._v !== wantVer) {
+    try {
+      const j = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status + " " + u); return r.json(); };
+      const man = await j("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+      const ver = man.versions.find(v => v.id === wantVer) || man.versions.find(v => v.id === man.latest.release);
+      const vj = await j(ver.url);
+      const idx = await j(vj.assetIndex.url);
+      const hash = idx.objects["minecraft/lang/de_de.json"].hash;
+      const de = await j(`https://resources.download.minecraft.net/${hash.slice(0, 2)}/${hash}`);
+      advNames = { _v: wantVer };
+      for (const [k, v] of Object.entries(de)) {
+        const m = k.match(/^advancements\.([a-z_]+)\.([a-z0-9_.]+)\.(title|description)$/);
+        if (!m) continue;
+        const id = `${m[1]}/${m[2].replace(/\./g, "/")}`;
+        (advNames[id] ||= {})[m[3] === "title" ? "t" : "d"] = v;
+      }
+      console.log(`Deutsche Fortschritt-Namen geladen (${ver.id}): ${Object.keys(advNames).length - 1}`);
+    } catch (e) { console.warn("Deutsche Fortschritt-Namen nicht geladen:", e.message); }
+  }
+
   // Mod-Liste
   const mods = ((await tryList(client, `${root}/mods`)) || []).filter(f => f.isFile && f.name.endsWith(".jar")).map(f => f.name).sort();
 
-  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, mods };
+  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, advNames, mods };
   const strip = o => JSON.stringify(o);
   if (old && strip({ ...old, updated: undefined }) === strip({ ...out, updated: undefined })) {
     console.log("Keine Änderungen seit dem letzten Lauf.");

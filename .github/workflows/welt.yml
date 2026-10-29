@@ -44,9 +44,11 @@ jobs:
           DATUM=$(TZ=Europe/Berlin date +%Y-%m-%d)
           ANZEIGE=$(TZ=Europe/Berlin date +%d.%m.%Y)
           ZIP="Minecraft-2026-Welt-$DATUM.zip"
-          (cd download && zip -rq "../$ZIP" .)
+          # In Teile von max. 1,9 GB aufteilen (GitHub erlaubt höchstens 2 GB pro Datei)
+          (cd download && zip -rq -s 1900m "../$ZIP" .)
+          ls -la Minecraft-2026-Welt-*
           TAG="welt-$DATUM-$(date +%H%M)"
-          gh release create "$TAG" "$ZIP" --title "Welt vom $ANZEIGE" --notes "Automatische Sicherung der Welt vom $ANZEIGE."
+          gh release create "$TAG" Minecraft-2026-Welt-$DATUM.z* --title "Welt vom $ANZEIGE" --notes "Automatische Sicherung der Welt vom $ANZEIGE." || { gh release delete "$TAG" --yes --cleanup-tag; exit 1; }
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^welt-' | tail -n +9 | while read t; do
             gh release delete "$t" --yes --cleanup-tag
           done

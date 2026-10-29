@@ -396,3 +396,7 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 .heat{grid-auto-columns:14px;justify-content:start}
 #badgeAll{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
 #badgeAll .badge{border:0;padding:0;background:none}
+.info.chan{grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:8px}
+.info.chan dl{padding:10px 12px}
+.info.chan dt{font-size:.72rem;overflow-wrap:anywhere}
+.info.chan dd{font-size:.88rem}

@@ -22,13 +22,14 @@ const CONFIG = {
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["karte.html", "Karte", 1], ["bingo.html", "Bingo", 1], ["discord.html", "Discord", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
 /* ---------- Helfer ---------- */
 const $ = id => document.getElementById(id);
-const addr = `${CONFIG.host}:${CONFIG.port}`;
+const addr = CONFIG.host;                          // angezeigte Adresse
+const fullAddr = `${CONFIG.host}:${CONFIG.port}`;   // für die Live-Abfrage
 const nf = new Intl.NumberFormat("de-DE");
 const nf1 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -115,12 +116,12 @@ async function loadStats(){
 }
 async function fetchStatus(){
   try {
-    const r = await fetch(`https://api.mcsrvstat.us/3/${addr}`, { cache: "no-store" });
+    const r = await fetch(`https://api.mcsrvstat.us/3/${fullAddr}`, { cache: "no-store" });
     const d = await r.json();
     return { online: !!d.online, count: d.players?.online ?? 0, max: d.players?.max ?? 0,
       players: (d.players?.list || []).map(p => p.name).filter(Boolean), version: d.version || "", motd: (d.motd?.clean || []).join("\n") };
   } catch (e) {}
-  const r = await fetch(`https://api.mcstatus.io/v2/status/java/${addr}`, { cache: "no-store" });
+  const r = await fetch(`https://api.mcstatus.io/v2/status/java/${fullAddr}`, { cache: "no-store" });
   const d = await r.json();
   return { online: !!d.online, count: d.players?.online ?? 0, max: d.players?.max ?? 0,
     players: (d.players?.list || []).map(p => p.name_clean).filter(Boolean), version: d.version?.name_clean || "", motd: d.motd?.clean || "" };
@@ -610,7 +611,7 @@ const PAGE_INIT = {
       setTimeout(() => $("copyBtn").textContent = "IP kopieren", 1800);
     });
     if (CONFIG.discord?.invite) $("statusPill").insertAdjacentHTML("afterend", `<a class="pill" href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener" style="text-decoration:none;border-color:#5865f2">Discord beitreten →</a>`);
-    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Karte", "Wochen-Bingo", "Todes-Feed", "Discord", addr];
+    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Wochen-Bingo", "Todes-Feed", "Discord", addr];
     const run = items.map(t => `<span>${esc(t)}</span><span>✦</span>`).join("");
     set("tickerInner", run + run);
     onUpdate(() => {
@@ -666,8 +667,7 @@ const PAGE_INIT = {
         p && `<span class="chip"><span class="lbl">Spielzeit</span><b>${H(p.play)}</b></span>`,
         p && `<span class="chip"><span class="lbl">Rang</span><b>#${rankOf(p, "play")}</b></span>`,
         pr && `<span class="chip"><span class="lbl">Level</span><b>${pr.xp}</b></span>`,
-        pr && `<span class="chip"><span class="lbl">${DIM[pr.dim] || esc(pr.dim)}</span><b>${pr.pos ? pr.pos.join(" / ") : "?"}</b></span>`,
-        pr?.pos && pr.dim === "overworld" && `<a class="chip" href="karte.html?x=${pr.pos[0]}&z=${pr.pos[2]}" style="text-decoration:none">Auf der Karte zeigen →</a>`
+        pr && `<span class="chip"><span class="lbl">${DIM[pr.dim] || esc(pr.dim)}</span><b>${pr.pos ? pr.pos.join(" / ") : "?"}</b></span>`
       ].filter(Boolean).join(""));
       if (!App.stats) return;
       $("pMain").hidden = !p;
@@ -782,7 +782,7 @@ const PAGE_INIT = {
           return `<article class="project">${p.bild ? `<img class="cover" loading="lazy" src="${esc(p.bild)}" alt="">` : ""}<div class="in"><span class="status ${st[0]}">${st[1]}</span><h3>${esc(p.name)}</h3>
             ${p.text ? `<p class="muted" style="margin:0">${esc(p.text)}</p>` : ""}${coords ? `<code>${DIM[p.dimension] || "Overworld"} · ${coords}</code>` : ""}
             ${(p.von || []).length ? `<div class="who">${p.von.map(n => `<a href="${plink(n)}" title="${esc(n)}"><img alt="${esc(n)}" src="${head(n)}"></a>`).join("")}</div>` : ""}
-            ${coords && (!p.dimension || p.dimension === "overworld") ? `<a class="more-link" href="karte.html?x=${p.x}&z=${p.z}">Auf der Karte zeigen →</a>` : ""}</div></article>`;
+            </div></article>`;
         }).join("") : empty("Noch nichts eingetragen.", "Projekte und Orte tragt ihr in content/projekte.json ein – Anleitung unten.", true));
       };
       draw();

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Galerie · Minecraft 2026</title>
+<meta name="description" content="Screenshots von Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="galerie">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Galerie</span><h1>Unsere Bauten</h1><p class="lead">Screenshots aus der Welt. Klick auf ein Bild für die große Ansicht.</p></div></section><section class="block-sec"><div class="wrap"><div class="gallery" id="gallery"></div><details class="panel" style="margin-top:28px"><summary style="cursor:pointer;font-weight:700">So kommt ein Bild in die Galerie</summary>
+<div style="display:grid;gap:10px;margin-top:12px">
+<ol class="muted" style="margin:0;padding-left:1.2em;display:grid;gap:6px">
+<li>Auf GitHub im Repository die Datei <code>content/galerie.json</code> öffnen.</li>
+<li>Oben rechts auf den Stift (Edit) klicken.</li>
+<li>Einen neuen Eintrag nach diesem Muster einfügen. Mehrere Einträge werden mit Komma getrennt, alles steht zwischen <code>[</code> und <code>]</code>.</li>
+<li><b>Commit changes</b> klicken. Nach 1–2 Minuten ist es auf der Seite.</li>
+</ol>
+<pre style="overflow-x:auto;background:var(--night);border-radius:8px;padding:12px;margin:0"><code style="background:none">[
+  {
+    "bild": "content/galerie/stadion.jpg",
+    "titel": "Fenerbahçe-Stadion",
+    "von": "Ali",
+    "datum": "29.10.2026"
+  }
+]</code></pre>
+<p class="small muted" style="margin:0">Vorher das Bild auf GitHub in den Ordner <code>content/galerie</code> hochladen (Add file → Upload files). Der Dateiname muss genau mit <code>bild</code> übereinstimmen.</p>
+</div></details></div></section><dialog class="lightbox" id="lightbox"><button class="close" type="button" id="lbClose" aria-label="Schließen">✕</button><img id="lbImg" alt=""><p id="lbText"></p></dialog>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

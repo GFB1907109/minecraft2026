@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aktivität · Minecraft 2026</title>
+<meta name="description" content="Wer war wann online, Aktivitäts-Kalender und Chat auf Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="aktivitaet">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Aktivität</span><h1>Wer war wann da?</h1><p class="lead">Sessions, Aktivitäts-Kalender und der Chat, alles aus den Server-Logs.</p></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Online</span><h2>Sessions pro Tag</h2><p class="lead">Gestreift heißt: ist gerade noch online.</p></div></div><div class="panel"><div class="seg" id="daySeg"></div><div class="timeline" id="timeline"></div><div class="tl-axis" id="tlAxis"></div><h3 class="sub" style="margin-top:22px">Zuletzt gesehen</h3><div class="seen" id="seen"></div></div></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Kalender</span><h2>Aktivität der letzten Wochen</h2><p class="lead">Jedes Kästchen ist ein Tag. Je grüner, desto mehr Stunden waren alle zusammen online.</p></div></div><div class="panel"><div class="heat" id="heat"></div><div class="heat-legend">weniger <i style="background:var(--night)"></i><i style="background:#2f5a1c"></i><i style="background:#3f7a22"></i><i style="background:#58a32f"></i><i style="background:#7fd148"></i> mehr</div></div></div></section><section class="block-sec" id="chat"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Chat</span><h2>Was wurde geschrieben?</h2><p class="lead">Der Spielchat der letzten Tage, alle 15 Minuten aktualisiert.</p></div></div><div class="chat" id="chatBox" tabindex="0" aria-label="Chat-Verlauf" style="max-height:560px"></div></div></section>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

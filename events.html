@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Events · Minecraft 2026</title>
+<meta name="description" content="Events auf Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="events">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Events</span><h1>Was steht an?</h1><p class="lead">Gemeinsame Termine auf dem Server, mit Countdown.</p></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Demnächst</span><h2>Kommende Events</h2></div></div><div class="events" id="upcoming"></div></div></section><section class="block-sec"><div class="wrap"><div class="sec-head"><div><span class="eyebrow">Vorbei</span><h2>Vergangene Events</h2></div></div><div class="events" id="past"></div><details class="panel" style="margin-top:28px"><summary style="cursor:pointer;font-weight:700">So tragt ihr ein Event ein</summary>
+<div style="display:grid;gap:10px;margin-top:12px">
+<ol class="muted" style="margin:0;padding-left:1.2em;display:grid;gap:6px">
+<li>Auf GitHub im Repository die Datei <code>content/events.json</code> öffnen.</li>
+<li>Oben rechts auf den Stift (Edit) klicken.</li>
+<li>Einen neuen Eintrag nach diesem Muster einfügen. Mehrere Einträge werden mit Komma getrennt, alles steht zwischen <code>[</code> und <code>]</code>.</li>
+<li><b>Commit changes</b> klicken. Nach 1–2 Minuten ist es auf der Seite.</li>
+</ol>
+<pre style="overflow-x:auto;background:var(--night);border-radius:8px;padding:12px;margin:0"><code style="background:none">[
+  {
+    "titel": "End-Öffnung",
+    "datum": "2026-11-06 20:00",
+    "ort": "Spawn",
+    "text": "Gemeinsam den Enderdrachen besiegen.",
+    "wer": ["Ali", "Mehmet"]
+  }
+]</code></pre>
+<p class="small muted" style="margin:0">Datum immer als JJJJ-MM-TT hh:mm. <code>ort</code>, <code>text</code> und <code>wer</code> sind freiwillig.</p>
+</div></details></div></section>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

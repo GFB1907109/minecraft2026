@@ -1,14 +1,19 @@
-// Holt die Welt-Stats per FTP vom G-Portal-Server und schreibt stats.json für die Website.
+// Holt alle Daten per FTP vom G-Portal-Server und schreibt stats.json für die Website:
+// Stats, Spielerdaten (Inventar, XP, Standort), Welt-Info, Server-Logs (Chat, Tode, Join/Leave),
+// Wochen-Challenges und das Staffel-Archiv.
 // Läuft automatisch über GitHub Actions (siehe .github/workflows/stats.yml).
 import { Client } from "basic-ftp";
 import { Writable } from "node:stream";
 import { writeFileSync, readFileSync } from "node:fs";
+import zlib from "node:zlib";
+import { readNbt, findKey, num } from "./mc-lib.mjs";
 
 const {
   FTP_HOST, FTP_USER, FTP_PASS,
   FTP_PORT = "21",
-  FTP_SECURE = "false",          // "true", falls G-Portal FTPS verlangt
-  WORLD_NAME = "world"           // Name des Welt-Ordners (level-name in server.properties)
+  FTP_SECURE = "false",
+  WORLD_NAME = "world",
+  SHOW_CHAT = "true"             // "false", wenn der Chat nicht auf der Website stehen soll
 } = process.env;
 
 if (!FTP_HOST || !FTP_USER || !FTP_PASS) {
@@ -16,26 +21,26 @@ if (!FTP_HOST || !FTP_USER || !FTP_PASS) {
   process.exit(1);
 }
 
-async function readText(client, path) {
+/* ---------- FTP-Helfer ---------- */
+async function readBuf(client, path) {
   const chunks = [];
   const sink = new Writable({ write(c, _e, cb) { chunks.push(c); cb(); } });
   await client.downloadTo(sink, path);
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
 }
+const readText = async (c, p) => (await readBuf(c, p)).toString("utf8");
+async function tryList(client, path) { try { return await client.list(path); } catch { return null; } }
 
-// Durchsucht den FTP-Zugang nach dem Welt-Ordner (der Ordner mit level.dat).
-// G-Portal legt die Welt je nach Server an unterschiedlichen Stellen ab.
-const SKIP_DIRS = new Set(["mods","config","logs","libraries","versions","crash-reports","region","entities","poi","playerdata","advancements","datapacks","data","DIM-1","DIM1","dimensions","cache",".fabric","resourcepacks","backups"]);
+const SKIP_DIRS = new Set(["mods","config","logs","libraries","versions","crash-reports","region","entities","poi","playerdata","advancements","datapacks","data","DIM-1","DIM1","dimensions","cache",".fabric","resourcepacks","backups","players","stats"]);
 async function findWorld(client) {
   const start = (await client.pwd()).replace(/\/$/, "");
   const seen = [];
   let queue = [start || ""];
   for (let depth = 0; depth <= 4 && queue.length; depth++) {
-    const next = [];
-    const found = [];
+    const next = [], found = [];
     for (const dir of queue) {
-      let list;
-      try { list = await client.list(dir || "/"); } catch { continue; }
+      const list = await tryList(client, dir || "/");
+      if (!list) continue;
       if (depth <= 1) seen.push(`${dir || "/"}: ${list.map(f => f.name).join(", ")}`);
       if (list.some(f => f.name === "level.dat")) found.push(dir);
       for (const f of list) if (f.isDirectory && !SKIP_DIRS.has(f.name) && !f.name.startsWith(".")) next.push(`${dir}/${f.name}`);
@@ -49,8 +54,13 @@ async function findWorld(client) {
   console.log("Gefundene Ordner:\n" + seen.join("\n"));
   throw new Error("Welt-Ordner mit level.dat nicht gefunden.");
 }
+async function firstDir(client, dirs) {
+  for (const d of dirs) { const l = await tryList(client, d); if (l && l.length) return { dir: d, list: l }; }
+  return null;
+}
 
-const UUID = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.json$/i;
+/* ---------- Stats ---------- */
+const UUID = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(json|dat)$/i;
 
 function extract(uuid, name, s) {
   const c = s["minecraft:custom"] || {}, mined = s["minecraft:mined"] || {}, killed = s["minecraft:killed"] || {};
@@ -80,41 +90,249 @@ function extract(uuid, name, s) {
   };
 }
 
-const client = new Client(30000);
+/* ---------- Spielerdaten (Inventar, XP, Standort) ---------- */
+const item = it => it && it.id ? {
+  s: it.Slot ?? null,
+  id: String(it.id).replace(/^minecraft:/, ""),
+  n: it.count ?? it.Count ?? 1,
+  e: !!(it.components?.["minecraft:enchantments"] || it.components?.["minecraft:stored_enchantments"] || it.tag?.Enchantments) || undefined
+} : null;
+
+function profile(nbt) {
+  const inv = (nbt.Inventory || []).map(item).filter(Boolean);
+  const eq = nbt.equipment || {};
+  const eqSlots = { feet: 100, legs: 101, chest: 102, head: 103, offhand: -106 };
+  for (const [k, slot] of Object.entries(eqSlots)) { const it = item(eq[k]); if (it) { it.s = slot; inv.push(it); } }
+  const pos = nbt.Pos ? nbt.Pos.map(v => Math.round(num(v))) : null;
+  return {
+    xp: nbt.XpLevel ?? 0, xpP: Math.round((nbt.XpP ?? 0) * 100) / 100,
+    health: Math.round((nbt.Health ?? 0) * 10) / 10, food: nbt.foodLevel ?? null,
+    dim: String(nbt.Dimension ?? "minecraft:overworld").replace(/^minecraft:/, ""),
+    pos, mode: nbt.playerGameType ?? null,
+    inv, ender: (nbt.EnderItems || []).map(item).filter(Boolean)
+  };
+}
+
+/* ---------- Welt-Info ---------- */
+const DIFF = { 0: "Friedlich", 1: "Einfach", 2: "Normal", 3: "Schwer", peaceful: "Friedlich", easy: "Einfach", normal: "Normal", hard: "Schwer" };
+function worldInfo(sources) {
+  const get = keys => { for (const s of sources) { const v = findKey(s, keys); if (v !== undefined) return v; } };
+  let diff = get(["Difficulty", "difficulty"]);
+  if (diff && typeof diff === "object") diff = findKey(diff, ["difficulty", "value"]);
+  let spawn = null;
+  const sx = get(["SpawnX"]);
+  if (sx !== undefined) spawn = [sx, get(["SpawnY"]), get(["SpawnZ"])].map(num);
+  else { const sp = get(["spawn", "respawn"]); const p = sp && (sp.pos || sp.Pos); if (Array.isArray(p)) spawn = p.map(num); }
+  const dayTime = num(get(["DayTime", "day_time"]) ?? get(["Time", "game_time"]) ?? 0);
+  const version = get(["Version"]);
+  return {
+    name: get(["LevelName"]) ?? null,
+    day: Math.floor(dayTime / 24000) + 1,
+    time: ((dayTime % 24000) + 24000) % 24000,
+    raining: !!get(["raining"]), thundering: !!get(["thundering"]),
+    difficulty: DIFF[diff] ?? (diff != null ? String(diff) : null),
+    hardcore: !!get(["hardcore"]),
+    spawn,
+    version: (version && version.Name) || null
+  };
+}
+
+/* ---------- Server-Logs ---------- */
+const LINE = /^\[(\d{2}:\d{2}:\d{2})\] \[[^\]]*\](?: \[[^\]]*\])?(?:: | \([^)]*\) )(.*)$/;
+const NAME = "[A-Za-z0-9_]{2,16}";
+const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+
+function parseLog(text, names, { start, end }) {
+  const rows = [];
+  let wraps = 0, prev = "";
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(LINE);
+    if (!m) continue;
+    if (prev && m[1] < prev) wraps++;
+    prev = m[1];
+    rows.push([wraps, m[1], m[2]]);
+  }
+  const day0 = start || addDays(end, -wraps);
+  const ev = [];
+  for (const [w, hms, msg] of rows) {
+    const t = `${addDays(day0, w)} ${hms}`;
+    let m;
+    if ((m = msg.match(new RegExp(`^(?:\\[Not Secure\\] )?<(${NAME})> (.*)$`)))) ev.push([t, "c", m[1], m[2].slice(0, 300)]);
+    else if ((m = msg.match(/^\[Server\] (.*)$/))) ev.push([t, "c", "Server", m[1].slice(0, 300)]);
+    else if ((m = msg.match(new RegExp(`^(${NAME}) joined the game`)))) ev.push([t, "j", m[1]]);
+    else if ((m = msg.match(new RegExp(`^(${NAME}) left the game`)))) ev.push([t, "l", m[1]]);
+    else if (/^Stopping (the )?server/.test(msg)) ev.push([t, "s"]);
+    else if (/^Starting minecraft server version/.test(msg)) ev.push([t, "b"]);
+    else {
+      const sp = msg.indexOf(" ");
+      const who = msg.slice(0, sp);
+      const rest = msg.slice(sp + 1);
+      if (sp > 0 && names.has(who) && /^(was |were |died|drowned|blew up|hit the ground|fell |experienced|burned|went up|walked into|tried to swim|discovered the floor|starved|suffocated|froze|withered|didn't want|left the confines)/.test(rest) && !/^was (kicked|banned)/.test(rest))
+        ev.push([t, "d", who, rest.slice(0, 200)]);
+    }
+  }
+  return ev;
+}
+
+/* ---------- Wochen-Challenges ---------- */
+const POOL = [
+  ["fish", 10, "Fange 10 Fische"], ["bred", 15, "Züchte 15 Tiere"], ["diamond", 10, "Baue 10 Diamanterz ab"],
+  ["debris", 4, "Finde 4 Antiken Schutt"], ["iron", 64, "Baue 64 Eisenerz ab"], ["coal", 128, "Baue 128 Kohleerz ab"],
+  ["logs", 256, "Fälle 256 Holzstämme"], ["mined", 5000, "Baue 5.000 Blöcke ab"], ["mobs", 100, "Töte 100 Mobs"],
+  ["creeper", 15, "Töte 15 Creeper"], ["zombie", 30, "Töte 30 Zombies"], ["enderman", 10, "Töte 10 Endermen"],
+  ["trades", 20, "Handle 20-mal mit Dorfbewohnern"], ["enchant", 5, "Verzaubere 5 Items"], ["crafted", 500, "Stelle 500 Items her"],
+  ["sleep", 5, "Schlafe 5-mal im Bett"], ["jumps", 1000, "Springe 1.000-mal"], ["walk", 1000000, "Laufe 10 km"],
+  ["elytra", 500000, "Fliege 5 km mit Elytra"], ["boat", 200000, "Fahre 2 km Boot"], ["play", 360000, "Spiele 5 Stunden"],
+  ["chests", 100, "Öffne 100 Truhen"], ["eaten", 7, "Iss einen ganzen Kuchen"], ["gold", 32, "Baue 32 Golderz ab"],
+  ["alive", 216000, "Überlebe 3 Stunden am Stück", true]
+];
+function berlinDate(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(d).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function isoWeek(dateStr) {
+  const d = new Date(dateStr + "T12:00:00Z");
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const y = d.getUTCFullYear();
+  const w = 1 + Math.round(((d - new Date(Date.UTC(y, 0, 4))) / 86400000 - 3 + ((new Date(Date.UTC(y, 0, 4)).getUTCDay() + 6) % 7)) / 7);
+  return `${y}-W${String(w).padStart(2, "0")}`;
+}
+function pickChallenges(weekId) {
+  let seed = [...weekId].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
+  const pool = [...POOL];
+  const out = [];
+  while (out.length < 9 && pool.length) out.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+  return out.map(([key, target, text, abs]) => ({ key, target, text, abs: !!abs || undefined }));
+}
+
+/* ---------- Hauptprogramm ---------- */
+let old = null;
+try { old = JSON.parse(readFileSync("stats.json", "utf8")); } catch {}
+
+const client = new Client(60000);
 try {
   await client.access({ host: FTP_HOST, port: Number(FTP_PORT || 21), user: FTP_USER, password: FTP_PASS, secure: FTP_SECURE === "true" });
   const { root, world } = await findWorld(client);
   console.log("Welt gefunden:", world);
-  // Ab Minecraft 26.1 liegen die Stats in <welt>/players/stats, davor in <welt>/stats
-  let statsDir = null;
-  for (const d of [`${world}/players/stats`, `${world}/stats`]) {
-    try { await client.list(d); statsDir = d; break; } catch {}
-  }
-  if (!statsDir) throw new Error("Kein Stats-Ordner gefunden. Ist schon jemand auf dem Server gewesen?");
-  console.log("Stats-Ordner:", statsDir);
 
+  // Namen
   const names = {};
-  try {
-    JSON.parse(await readText(client, `${root}/usercache.json`)).forEach(e => { names[e.uuid.toLowerCase()] = e.name; });
-  } catch { console.warn("usercache.json nicht gefunden – Namen fehlen evtl."); }
+  try { JSON.parse(await readText(client, `${root}/usercache.json`)).forEach(e => { names[e.uuid.toLowerCase()] = e.name; }); }
+  catch { console.warn("usercache.json nicht gefunden – Namen fehlen evtl."); }
+  const nameSet = new Set(Object.values(names));
 
-  const files = (await client.list(`${statsDir}`)).filter(f => UUID.test(f.name));
+  // Stats
   const players = [];
-  for (const f of files) {
+  const st = await firstDir(client, [`${world}/players/stats`, `${world}/stats`]);
+  if (!st) throw new Error("Kein Stats-Ordner gefunden. Ist schon jemand auf dem Server gewesen?");
+  for (const f of st.list.filter(f => UUID.test(f.name))) {
     const uuid = f.name.match(UUID)[1].toLowerCase();
-    try {
-      const data = JSON.parse(await readText(client, `${statsDir}/${f.name}`));
-      players.push(extract(uuid, names[uuid] || uuid.slice(0, 8), data.stats || {}));
-    } catch (e) { console.warn("Übersprungen:", f.name, e.message); }
+    try { players.push(extract(uuid, names[uuid] || uuid.slice(0, 8), JSON.parse(await readText(client, `${st.dir}/${f.name}`)).stats || {})); }
+    catch (e) { console.warn("Stats übersprungen:", f.name, e.message); }
   }
   players.sort((a, b) => a.uuid.localeCompare(b.uuid));
-  let old = null;
-  try { old = JSON.parse(readFileSync("stats.json", "utf8")); } catch {}
-  if (old && JSON.stringify(old.players) === JSON.stringify(players)) {
+  console.log(`Stats: ${players.length} Spieler`);
+
+  // Spielerdaten
+  const profiles = {};
+  const pd = await firstDir(client, [`${world}/players/data`, `${world}/playerdata`]);
+  for (const f of (pd?.list || []).filter(f => UUID.test(f.name) && f.name.endsWith(".dat"))) {
+    const uuid = f.name.match(UUID)[1].toLowerCase();
+    try { profiles[uuid] = profile(readNbt(await readBuf(client, `${pd.dir}/${f.name}`))); }
+    catch (e) { console.warn("Spielerdaten übersprungen:", f.name, e.message); }
+  }
+  console.log(`Spielerdaten: ${Object.keys(profiles).length}`);
+
+  // Welt-Info: level.dat plus kleine Dateien aus data/minecraft (ab 26.1 liegen dort Teile davon)
+  const sources = [];
+  try { sources.push(readNbt(await readBuf(client, `${world}/level.dat`))); } catch (e) { console.warn("level.dat:", e.message); }
+  for (const dir of [`${world}/data/minecraft`, `${world}/data`]) {
+    for (const f of (await tryList(client, dir)) || []) {
+      if (f.isFile && f.name.endsWith(".dat") && f.size < 65536 && !/^(map_|raids|scoreboard|idcounts|chunks|random_sequences|command_storage)/.test(f.name)) {
+        try { sources.push(readNbt(await readBuf(client, `${dir}/${f.name}`))); } catch {}
+      }
+    }
+  }
+  const worldData = worldInfo(sources);
+  console.log("Welt:", JSON.stringify(worldData));
+
+  // Logs
+  const log = { processed: [], archive: [], current: [], ...(old?.log || {}) };
+  const logs = (await tryList(client, `${root}/logs`)) || [];
+  const gz = logs.filter(f => /^\d{4}-\d{2}-\d{2}-\d+\.log\.gz$/.test(f.name) && !log.processed.includes(f.name))
+    .sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
+  for (const f of gz) {
+    try {
+      const text = zlib.gunzipSync(await readBuf(client, `${root}/logs/${f.name}`)).toString("utf8");
+      log.archive.push(...parseLog(text, nameSet, { start: f.name.slice(0, 10) }));
+      log.processed.push(f.name);
+    } catch (e) { console.warn("Log übersprungen:", f.name, e.message); }
+  }
+  if (logs.some(f => f.name === "latest.log")) {
+    let end = berlinDate();
+    try { end = berlinDate(await client.lastMod(`${root}/logs/latest.log`)); } catch {}
+    log.current = parseLog(await readText(client, `${root}/logs/latest.log`), nameSet, { end });
+  }
+  if (SHOW_CHAT !== "true") { log.archive = log.archive.filter(e => e[1] !== "c"); log.current = log.current.filter(e => e[1] !== "c"); }
+  // Begrenzen: Tode komplett (max. 3000), Chat die letzten 500, Join/Leave die letzten 4000
+  log.archive.sort((a, b) => a[0].localeCompare(b[0]));
+  const keep = (type, n) => log.archive.filter(e => type.includes(e[1])).slice(-n);
+  log.archive = [...keep("d", 3000), ...keep("c", 500), ...keep("jlsb", 4000)].sort((a, b) => a[0].localeCompare(b[0]));
+  log.processed = log.processed.slice(-400);
+  console.log(`Logs: ${gz.length} neue Archiv-Dateien, ${log.archive.length + log.current.length} Ereignisse`);
+
+  // Staffel-Archiv: Fällt die gesamte Spielzeit stark ab, wurde eine neue Welt gestartet
+  const now = new Date().toISOString();
+  let season = old?.season || { n: 1, from: now };
+  const seasons = old?.seasons || [];
+  const totalPlay = ps => (ps || []).reduce((a, p) => a + (p.play || 0), 0);
+  const prevTotal = totalPlay(old?.players), curTotal = totalPlay(players);
+  let week = old?.week;
+  if (prevTotal > 144000 && curTotal < prevTotal * 0.5) {
+    console.log("Neue Welt erkannt – alte Staffel wird archiviert.");
+    seasons.push({ n: season.n, name: `Staffel ${season.n}`, from: season.from, to: now, world: old.world || null, players: old.players });
+    season = { n: season.n + 1, from: now };
+    week = null;
+  }
+
+  // Wochen-Challenges
+  const weekId = isoWeek(berlinDate());
+  if (!week || week.id !== weekId) week = { id: weekId, base: {} };
+  const challenges = pickChallenges(weekId);
+  // Basiswerte zum Wochenanfang (für Challenges und „Spieler der Woche“)
+  const weekKeys = [...new Set([...challenges.map(c => c.key), "play", "deaths", "mined", "mobs", "diamond", "dist"])];
+  for (const p of players) {
+    week.base[p.uuid] ||= {};
+    for (const k of weekKeys) if (!(k in week.base[p.uuid])) week.base[p.uuid][k] = p[k] || 0;
+  }
+
+  // Advancements (Fortschritte): erledigte Fortschritte mit Datum
+  const adv = {};
+  const ad = await firstDir(client, [`${world}/players/advancements`, `${world}/advancements`]);
+  for (const f of (ad?.list || []).filter(f => UUID.test(f.name) && f.name.endsWith(".json"))) {
+    const uuid = f.name.match(UUID)[1].toLowerCase();
+    try {
+      const data = JSON.parse(await readText(client, `${ad.dir}/${f.name}`));
+      adv[uuid] = Object.entries(data)
+        .filter(([k, v]) => v && v.done && !k.includes(":recipes/") && k !== "DataVersion")
+        .map(([k, v]) => [k.replace(/^minecraft:/, ""), Object.values(v.criteria || {}).sort().pop()?.slice(0, 19) || null])
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+    } catch (e) { console.warn("Advancements übersprungen:", f.name, e.message); }
+  }
+  console.log(`Advancements: ${Object.keys(adv).length} Spieler`);
+
+  // Mod-Liste
+  const mods = ((await tryList(client, `${root}/mods`)) || []).filter(f => f.isFile && f.name.endsWith(".jar")).map(f => f.name).sort();
+
+  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, mods };
+  const strip = o => JSON.stringify(o);
+  if (old && strip({ ...old, updated: undefined }) === strip({ ...out, updated: undefined })) {
     console.log("Keine Änderungen seit dem letzten Lauf.");
   } else {
-    writeFileSync("stats.json", JSON.stringify({ updated: new Date().toISOString(), players }, null, 2));
-    console.log(`stats.json geschrieben: ${players.length} Spieler.`);
+    writeFileSync("stats.json", JSON.stringify({ updated: now, ...out }));
+    console.log("stats.json geschrieben.");
   }
 } finally {
   client.close();

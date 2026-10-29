@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Projekte & Orte · Minecraft 2026</title>
+<meta name="description" content="Bauprojekte und wichtige Orte auf Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="projekte">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Projekte & Orte</span><h1>Was wird gebaut, wo ist was?</h1><p class="lead">Bauprojekte mit Status und das Koordinaten-Buch für Basen, Dörfer und Portale. Alles mit Koordinaten erscheint auch auf der Karte.</p></div></section><section class="block-sec"><div class="wrap"><div class="seg filters" id="filters"></div><div class="projects" id="projects"></div><details class="panel" style="margin-top:28px"><summary style="cursor:pointer;font-weight:700">So tragt ihr ein Projekt oder einen Ort ein</summary>
+<div style="display:grid;gap:10px;margin-top:12px">
+<ol class="muted" style="margin:0;padding-left:1.2em;display:grid;gap:6px">
+<li>Auf GitHub im Repository die Datei <code>content/projekte.json</code> öffnen.</li>
+<li>Oben rechts auf den Stift (Edit) klicken.</li>
+<li>Einen neuen Eintrag nach diesem Muster einfügen. Mehrere Einträge werden mit Komma getrennt, alles steht zwischen <code>[</code> und <code>]</code>.</li>
+<li><b>Commit changes</b> klicken. Nach 1–2 Minuten ist es auf der Seite.</li>
+</ol>
+<pre style="overflow-x:auto;background:var(--night);border-radius:8px;padding:12px;margin:0"><code style="background:none">[
+  {
+    "name": "Fenerbahçe-Stadion",
+    "typ": "projekt",
+    "status": "im Bau",
+    "von": ["Ali"],
+    "x": 250, "y": 64, "z": -120,
+    "dimension": "overworld",
+    "bild": "content/galerie/stadion.jpg",
+    "text": "1:1-Nachbau des Şükrü Saracoğlu."
+  },
+  {
+    "name": "Nether-Portal Basis",
+    "typ": "ort",
+    "x": 30, "y": 70, "z": 12
+  }
+]</code></pre>
+<p class="small muted" style="margin:0"><code>typ</code> ist <code>projekt</code> oder <code>ort</code>. <code>status</code> ist <code>geplant</code>, <code>im Bau</code> oder <code>fertig</code>. <code>dimension</code> ist <code>overworld</code>, <code>the_nether</code> oder <code>the_end</code>. Alles außer <code>name</code> ist freiwillig.</p>
+</div></details></div></section>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

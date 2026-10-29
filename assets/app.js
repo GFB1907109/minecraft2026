@@ -11,14 +11,18 @@ const CONFIG = {
   software: "Fabric",
   refreshSeconds: 30,
   github: "GFB1907109/minecraft2026",
-  crew: []          // Spieler, die immer angezeigt werden sollen, z. B. ["Steve","Alex"]
+  crew: [],         // Spieler, die immer angezeigt werden sollen, z. B. ["Steve","Alex"]
+  discord: {
+    invite: "https://discord.gg/M5Rr54WRMV",     // Einladungslink
+    serverId: ""    // Server-ID (Discord → Servereinstellungen → Widget), z. B. "123456789012345678"
+  }
 };
 /* ================================== */
 
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["karte.html", "Karte", 1], ["bingo.html", "Bingo", 1], ["events.html", "Events", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["karte.html", "Karte", 1], ["bingo.html", "Bingo", 1], ["events.html", "Events", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
@@ -581,7 +585,8 @@ const PAGE_INIT = {
       catch { const r = document.createRange(); r.selectNodeContents($("ipText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copyBtn").textContent = "Markiert"; }
       setTimeout(() => $("copyBtn").textContent = "IP kopieren", 1800);
     });
-    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Karte", "Wochen-Bingo", "Todes-Feed", "Events", addr];
+    if (CONFIG.discord?.invite) $("statusPill").insertAdjacentHTML("afterend", `<a class="pill" href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener" style="text-decoration:none;border-color:#5865f2">Discord beitreten →</a>`);
+    const items = [CONFIG.name, CONFIG.software + " " + CONFIG.version, "Live-Stats", "Karte", "Wochen-Bingo", "Todes-Feed", "Events", "Discord", addr];
     const run = items.map(t => `<span>${esc(t)}</span><span>✦</span>`).join("");
     set("tickerInner", run + run);
     let events = [];
@@ -781,6 +786,35 @@ const PAGE_INIT = {
             <ol>${top.map(p => `<li>${esc(p.name)} · ${H(p.play||0)}</li>`).join("")}</ol><a class="btn" style="display:inline-block;margin-top:12px" href="stats.html">Zu den Bestenlisten</a></div>`; }).join("") ||
         empty("Noch keine Daten."));
     });
+  },
+
+  discord(){
+    const D = CONFIG.discord || {};
+    set("dJoin", D.invite
+      ? `<a class="btn" href="${esc(D.invite)}" target="_blank" rel="noopener" style="font-size:1.1rem;padding:14px 22px;display:inline-block">Discord beitreten</a><p class="small muted" style="margin:10px 0 0">Oder diesen Link teilen: <code>${esc(D.invite)}</code></p>`
+      : `<p class="muted" style="margin:0">Der Einladungslink wird gerade eingerichtet. Frag einen Admin nach dem Link.</p>`);
+    if (!D.serverId) { set("dLive", empty("Live-Anzeige noch nicht eingerichtet.", "Ein Admin muss in Discord das Server-Widget einschalten und die Server-ID eintragen – Anleitung unten.")); return; }
+    async function load(){
+      try {
+        const r = await fetch(`https://discord.com/api/guilds/${encodeURIComponent(D.serverId)}/widget.json`, { cache: "no-store" });
+        if (!r.ok) throw r.status;
+        const w = await r.json();
+        const members = w.members || [];
+        const inVoice = members.filter(m => m.channel_id);
+        const voice = (w.channels || []).map(c => ({ ...c, who: inVoice.filter(m => m.channel_id === c.id) }));
+        const dot = st => `<span style="width:10px;height:10px;border-radius:50%;flex:none;background:${st === "online" ? "var(--grass)" : st === "idle" ? "var(--gold)" : st === "dnd" ? "var(--red)" : "var(--muted)"}"></span>`;
+        set("dLive", `<div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+            <div class="tile main"><span class="k">Online im Discord</span><span class="v">${w.presence_count ?? members.length}</span><span class="s">${esc(w.name || "")}</span></div>
+            <div class="tile"><span class="k">In Sprachkanälen</span><span class="v">${inVoice.length}</span><span class="s">gerade am Reden</span></div></div>
+          <div class="two" style="margin-top:16px">
+            <div class="panel"><h3 class="sub">Sprachkanäle</h3><div class="feed">${voice.length ? voice.map(c => `<div class="fi" style="grid-template-columns:minmax(0,1fr) auto"><span class="tx"><b>🔊 ${esc(c.name)}</b>${c.who.length ? `<br><span class="small muted">${c.who.map(m => esc(m.username)).join(", ")}</span>` : ""}</span><span class="tm">${c.who.length} drin</span></div>`).join("") : `<p class="muted small">Keine öffentlichen Sprachkanäle.</p>`}</div></div>
+            <div class="panel"><h3 class="sub">Gerade online</h3><div class="feed">${members.length ? members.slice(0, 60).map(m => `<div class="fi"><img alt="" loading="lazy" src="${esc(m.avatar_url || "")}" style="border-radius:50%"><span class="tx"><b>${esc(m.username)}</b>${m.game?.name ? `<br><span class="small muted">spielt ${esc(m.game.name)}</span>` : ""}</span>${dot(m.status)}</div>`).join("") : `<p class="muted small">Gerade ist niemand online.</p>`}</div></div>
+          </div><p class="updated" style="margin:10px 0 0">Aktualisiert um ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} · Discord zeigt hier höchstens 100 Mitglieder</p>`);
+      } catch (e) {
+        set("dLive", empty("Discord-Daten gerade nicht erreichbar.", e === 403 ? "Das Server-Widget ist in Discord ausgeschaltet. Ein Admin muss es unter Servereinstellungen → Widget einschalten." : "Bitte die Seite gleich nochmal laden."));
+      }
+    }
+    load(); setInterval(load, 60000);
   },
 
   infos(){

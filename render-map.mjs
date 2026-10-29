@@ -78,6 +78,7 @@ function blockAt(sections, y, x, z) {
 }
 
 const regions = [];
+const stats = { px: 0, sample: null };
 const files = readdirSync(regionDir).filter(f => /^r\.-?\d+\.-?\d+\.mca$/.test(f));
 for (const f of files) {
   const [, rx, rz] = f.match(/^r\.(-?\d+)\.(-?\d+)\.mca$/).map(Number);
@@ -93,18 +94,35 @@ for (const f of files) {
     const secList = c.sections || c.Sections || [];
     const sections = new Map(secList.map(s => [s.Y, s]));
     const hmAll = c.Heightmaps || {};
-    const hm = hmAll.MOTION_BLOCKING || hmAll.WORLD_SURFACE;
-    if (!hm || !hm.length) continue;
-    const minY = (num(c.yPos ?? -4)) * 16;
-    const hbits = Math.floor(64 / Math.ceil(256 / hm.length));
+    const hm = hmAll.MOTION_BLOCKING || hmAll.WORLD_SURFACE || hmAll.motion_blocking || hmAll.world_surface;
+    if (!secList.length) continue;
+    const minY = c.yPos != null ? num(c.yPos) * 16 : Math.min(...secList.map(sc => sc.Y)) * 16;
+    const hbits = hm && hm.length ? Math.floor(64 / Math.ceil(256 / hm.length)) : 9;
+    if (!stats.sample) stats.sample = { keys: Object.keys(c).slice(0, 25), status: c.Status, heightmaps: Object.keys(hmAll), sections: secList.length, palette: (secList.find(sc => (sc.block_states?.palette || []).length > 1)?.block_states.palette || []).slice(0, 6).map(b => b.Name), minY };
     chunks++;
+    const topY = Math.max(...secList.map(sc => sc.Y)) * 16 + 15;
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
-      const h = packed(hm, hbits, z * 16 + x);
-      if (!h) continue;
-      let y = minY + h - 1;
-      let name = blockAt(sections, y, x, z);
-      while (name && AIR.test(name) && y > minY) { y--; name = blockAt(sections, y, x, z); }
+      let y = null, name = null;
+      // 1. Versuch: Höhenangabe aus dem Chunk
+      if (hm && hm.length) {
+        const h = packed(hm, hbits, z * 16 + x);
+        if (h) {
+          y = minY + h - 1;
+          name = blockAt(sections, y, x, z);
+          let guard = 0;
+          while (name && AIR.test(name) && y > minY && guard++ < 64) { y--; name = blockAt(sections, y, x, z); }
+          if (name && AIR.test(name)) name = null;
+        }
+      }
+      // 2. Versuch: von ganz oben nach unten den ersten echten Block suchen
+      if (!name) {
+        for (y = topY; y >= minY; y--) {
+          const n = blockAt(sections, y, x, z);
+          if (n && !AIR.test(n)) { name = n; break; }
+        }
+      }
       if (!name) continue;
+      stats.px++;
       let [r, g, b] = colorOf(name);
       if (/water|seagrass|kelp/.test(name)) {
         let d = 0;
@@ -129,6 +147,7 @@ for (const f of files) {
   writeFileSync(join(outDir, "tiles", `${rx}.${rz}.png`), encodePng(512, 512, rgba));
   regions.push([rx, rz]);
   console.log(`Region ${rx},${rz}: ${chunks} Chunks`);
+  if (regions.length === 1) console.log("Beispiel-Chunk:", JSON.stringify(stats.sample));
 }
 
 let spawn = null;
@@ -138,4 +157,4 @@ try {
   if (sx !== undefined) spawn = [num(sx), num(findKey(lvl, ["SpawnZ"]))];
 } catch {}
 writeFileSync(join(outDir, "index.json"), JSON.stringify({ generated: new Date().toISOString(), regions, spawn }));
-console.log(`Fertig: ${regions.length} Regionen gerendert.`);
+console.log(`Fertig: ${regions.length} Regionen gerendert, ${stats.px} Pixel gezeichnet.`);

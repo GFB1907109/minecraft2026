@@ -562,10 +562,16 @@ async function downloadsInto(id){
     const rel = (await r.json()).filter(x => !x.draft && x.assets?.some(a => a.name.endsWith(".zip")));
     if (!rel.length) { box.innerHTML = empty("Noch keine Welt hochgeladen.", "Die erste Sicherung erscheint hier automatisch am Sonntag."); return; }
     box.innerHTML = rel.map((x, i) => {
-      const a = x.assets.find(a => a.name.endsWith(".zip")), mb = a.size / 1048576;
-      const size = mb >= 1024 ? nf1.format(mb / 1024) + " GB" : nf.format(Math.round(mb)) + " MB";
+      const fmt = n => { const mb = n / 1048576; return mb >= 1024 ? nf1.format(mb / 1024) + " GB" : nf.format(Math.round(mb)) + " MB"; };
+      // Teile sortieren: .z01, .z02, … und zuletzt .zip
+      const parts = x.assets.filter(a => /\.(zip|z\d+)$/.test(a.name)).sort((a, b) => (a.name.endsWith(".zip") - b.name.endsWith(".zip")) || a.name.localeCompare(b.name));
+      const size = parts.reduce((s, a) => s + a.size, 0);
+      const dl = Math.max(...parts.map(a => a.download_count));
+      const multi = parts.length > 1;
       return `<div class="dl-item${i === 0 ? " latest" : ""}"><span class="ico" aria-hidden="true"></span><div style="min-width:0"><h3>${esc(x.name || x.tag_name)}${i === 0 ? '<span class="tag">Neueste</span>' : ""}</h3>
-        <div class="meta">${new Date(x.published_at || x.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })} · ${size} · ${nf.format(a.download_count)}× geladen</div></div><a class="btn" href="${esc(a.browser_download_url)}">Welt herunterladen</a></div>`;
+        <div class="meta">${new Date(x.published_at || x.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })} · ${fmt(size)} · ${nf.format(dl)}× geladen${multi ? ` · ${parts.length} Teile` : ""}</div>
+        ${multi ? `<p class="small muted" style="margin:6px 0 0">Alle Teile in denselben Ordner laden, dann die <code>.zip</code>-Datei mit 7-Zip oder WinRAR entpacken.</p>` : ""}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">${parts.map((a, k) => `<a class="btn" href="${esc(a.browser_download_url)}">${multi ? `Teil ${k + 1} (${fmt(a.size)})` : "Welt herunterladen"}</a>`).join("")}</div></div>`;
     }).join("");
   } catch { box.innerHTML = empty("Downloads gerade nicht erreichbar.", "Bitte die Seite in ein paar Minuten neu laden."); }
 }

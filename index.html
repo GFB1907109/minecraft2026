@@ -137,6 +137,15 @@ code{font-family:var(--f-mono);font-size:.9em;color:var(--text);background:var(-
 .btns{display:flex;flex-wrap:wrap;gap:10px}
 .msg{font-size:.92rem;color:var(--gold);min-height:1.2em}
 
+.dl{display:grid;gap:12px}
+.dl-item{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;align-items:center;background:var(--dusk);border:2px solid var(--line);border-radius:10px;padding:14px 16px}
+.dl-item.latest{border-color:var(--grass-deep)}
+.dl-item .ico{width:64px;height:64px;border-radius:8px;background:linear-gradient(var(--grass) 0 30%,var(--dirt) 30%);box-shadow:inset 0 -5px 0 rgba(0,0,0,.25)}
+.dl-item h3{font-size:1.25rem;overflow-wrap:anywhere}
+.dl-item .meta{font-size:.88rem;color:var(--muted)}
+.dl-item .tag{display:inline-block;font-size:.75rem;font-weight:700;background:var(--grass);color:#10200a;border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle}
+.dl-item a.btn{text-decoration:none;white-space:nowrap}
+@media (max-width:560px){.dl-item{grid-template-columns:48px minmax(0,1fr)}.dl-item .ico{width:48px;height:48px}.dl-item a.btn{grid-column:1/-1;text-align:center}}
 .info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .info dl{margin:0;background:var(--dusk);border:2px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:4px}
 .info dt{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -174,6 +183,7 @@ footer p{margin:0;font-size:.9rem;opacity:.85}
       <a href="#rekorde">Rekorde</a>
       <a href="#crew">Spieler</a>
       <a href="#stats">Stats</a>
+      <a href="#downloads">Downloads</a>
       <a href="#server">Server</a>
     </nav>
   </div>
@@ -270,6 +280,19 @@ footer p{margin:0;font-size:.9rem;opacity:.85}
     </div>
   </section>
 
+  <section class="block-sec" id="downloads">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <span class="eyebrow">Downloads</span>
+          <h2>Unsere Welt zum Mitnehmen</h2>
+          <p class="lead">Jeden Sonntag wird die Welt automatisch gesichert. Runterladen, entpacken, in den <code>saves</code>-Ordner legen und im Einzelspieler durchlaufen.</p>
+        </div>
+      </div>
+      <div class="dl" id="dlList"></div>
+    </div>
+  </section>
+
   <section class="block-sec" id="server">
     <div class="wrap">
       <div class="sec-head"><div><span class="eyebrow">Server</span><h2>So kommt ihr rein</h2></div></div>
@@ -309,6 +332,8 @@ const CONFIG = {
   version: "26.3",
   software: "Fabric",
   refreshSeconds: 30,
+  // GitHub-Repository, in dem die Welt-Downloads als Releases liegen
+  github: "GFB1907109/minecraft2026",
   // Spieler, die immer in der Crew stehen sollen (auch ohne Stats), z. B. ["Steve","Alex"]
   crew: []
 };
@@ -639,6 +664,33 @@ $("resetBtn").addEventListener("click", () => {
   loadStats();
 });
 
+/* ---------- Welt-Downloads (GitHub Releases) ---------- */
+async function loadDownloads(){
+  const box = $("dlList");
+  const empty = (t, s) => box.innerHTML = `<div class="empty"><strong>${t}</strong><span>${s}</span></div>`;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${CONFIG.github}/releases?per_page=20`);
+    if (!r.ok) throw new Error();
+    const rel = (await r.json()).filter(x => !x.draft && x.assets?.some(a => a.name.endsWith(".zip")));
+    if (!rel.length) return empty("Noch keine Welt hochgeladen.", "Die erste Sicherung erscheint hier automatisch am Sonntag – oder sofort, wenn ein Admin sie per Knopfdruck startet.");
+    box.innerHTML = "";
+    rel.forEach((x, i) => {
+      const a = x.assets.find(a => a.name.endsWith(".zip"));
+      const mb = a.size / 1048576;
+      const size = mb >= 1024 ? nf1.format(mb / 1024) + " GB" : nf.format(Math.round(mb)) + " MB";
+      const date = new Date(x.published_at || x.created_at).toLocaleDateString("de-DE", { dateStyle: "long" });
+      const el = document.createElement("div"); el.className = "dl-item" + (i === 0 ? " latest" : "");
+      el.innerHTML = `<span class="ico" aria-hidden="true"></span>
+        <div style="min-width:0"><h3>${esc(x.name || x.tag_name)}${i === 0 ? '<span class="tag">Neueste</span>' : ""}</h3>
+        <div class="meta">${date} · ${size} · ${nf.format(a.download_count)}× geladen</div></div>
+        <a class="btn" href="${esc(a.browser_download_url)}">Welt herunterladen</a>`;
+      box.append(el);
+    });
+  } catch {
+    empty("Downloads gerade nicht erreichbar.", "Bitte die Seite in ein paar Minuten neu laden.");
+  }
+}
+
 /* ---------- Sternenhimmel ---------- */
 (function stars(){
   const c = $("stars"), x = c.getContext("2d");
@@ -659,6 +711,7 @@ $("resetBtn").addEventListener("click", () => {
 
 setStats(null);
 loadStats();
+loadDownloads();
 refreshLive();
 setInterval(refreshLive, CONFIG.refreshSeconds * 1000);
 // Welt-Stats jede Minute neu laden (die Datei wird automatisch alle 15 Minuten erneuert)

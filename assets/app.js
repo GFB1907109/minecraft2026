@@ -14,7 +14,7 @@ const CONFIG = {
   crew: [],         // Spieler, die immer angezeigt werden sollen, z. B. ["Steve","Alex"]
   discord: {
     invite: "https://discord.gg/M5Rr54WRMV",     // Einladungslink
-    serverId: ""    // Server-ID (Discord → Servereinstellungen → Widget), z. B. "123456789012345678"
+    serverId: "1557866330714017823"    // Server-ID (Discord → Servereinstellungen → Widget)
   }
 };
 /* ================================== */

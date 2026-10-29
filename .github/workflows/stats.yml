@@ -2,7 +2,7 @@ name: Stats aktualisieren
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,4 +32,6 @@ jobs:
           git config user.name "stats-bot"
           git config user.email "stats-bot@users.noreply.github.com"
           git add stats.json
-          git diff --cached --quiet || (git commit -m "Stats aktualisiert" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "Stats aktualisiert"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done

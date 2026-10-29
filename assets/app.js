@@ -32,8 +32,22 @@ const addr = `${CONFIG.host}:${CONFIG.port}`;
 const nf = new Intl.NumberFormat("de-DE");
 const nf1 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const head = n => `https://mc-heads.net/avatar/${encodeURIComponent(n)}/64`;
-const body = n => `https://mc-heads.net/body/${encodeURIComponent(n)}/120`;
+// Skins über die feste Spieler-ID (Crafatar erneuert Skins schnell), stündlich frisch geladen.
+// Ohne bekannte ID (z. B. neuer Spieler) über den Namen bei mc-heads.net.
+const skinHour = () => Math.floor(Date.now() / 36e5);
+const uuidOf = n => (App.stats?.players || []).find(p => p.name.toLowerCase() === String(n).toLowerCase())?.uuid;
+const head = n => { const u = uuidOf(n); return u ? `https://crafatar.com/avatars/${u}?size=64&overlay&v=${skinHour()}` : `https://mc-heads.net/avatar/${encodeURIComponent(n)}/64?v=${skinHour()}`; };
+const body = n => { const u = uuidOf(n); return u ? `https://crafatar.com/renders/body/${u}?scale=6&overlay&v=${skinHour()}` : `https://mc-heads.net/body/${encodeURIComponent(n)}/120?v=${skinHour()}`; };
+// Fällt Crafatar aus, springt jedes Bild auf mc-heads.net zurück
+document.addEventListener("error", e => {
+  const img = e.target;
+  if (img.tagName !== "IMG" || !img.src.includes("crafatar.com") || img.dataset.fb) return;
+  img.dataset.fb = 1;
+  const isBody = img.src.includes("/renders/body/");
+  const u = img.src.match(/[0-9a-f-]{36}/)?.[0];
+  const p = (App.stats?.players || []).find(x => x.uuid === u);
+  if (p) img.src = isBody ? `https://mc-heads.net/body/${encodeURIComponent(p.name)}/120` : `https://mc-heads.net/avatar/${encodeURIComponent(p.name)}/64`;
+}, true);
 const lc = s => String(s).toLowerCase();
 const plink = n => `profil.html?name=${encodeURIComponent(n)}`;
 const range = (a, b) => Array.from({ length: b - a }, (_, i) => a + i);
@@ -71,7 +85,7 @@ function buildChrome(){
     <strong style="font-family:var(--f-display);font-size:1.4rem;letter-spacing:-.02em">${esc(CONFIG.name)}</strong>
     <p>${PAGES.map(([f, n]) => `<a href="${f}" style="text-decoration:none;margin-right:14px">${n}</a>`).join("")}</p>
     <p>Unser privater Minecraft-Server · <code style="background:rgba(0,0,0,.25)">${esc(addr)}</code></p>
-    <p>Live-Daten über api.mcsrvstat.us, Skins über mc-heads.net, Item-Bilder über minecraft.wiki. Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt und nicht mit Mojang oder Microsoft verbunden.</p>
+    <p>Live-Daten über api.mcsrvstat.us, Skins über crafatar.com und mc-heads.net, Item-Bilder über minecraft.wiki. Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt und nicht mit Mojang oder Microsoft verbunden.</p>
   </div>`;
   document.querySelectorAll(".cfg-addr").forEach(e => e.textContent = addr);
 }

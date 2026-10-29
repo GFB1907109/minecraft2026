@@ -615,18 +615,32 @@ const PAGE_INIT = {
     set("tickerInner", run + run);
     onUpdate(() => {
       liveStatusInto();
-      set("tiles", tilesHtml()); set("worldbar", worldHtml());
-      const on = App.live.players || [];
-      set("onlineNow", on.length ? `<div class="online-now">${on.map(n => `<a href="${plink(n)}"><img alt="" src="${head(n)}">${esc(n)}</a>`).join("")}</div>` : `<p class="muted" style="margin:0">${App.live.checked ? "Gerade ist niemand online." : "Wird geprüft …"}</p>`);
+      const L = App.live, on = L.players || [];
+      set("onCount", L.checked ? String(L.online ? L.count : 0) : "–");
+      set("onMax", !L.checked ? "wird geprüft …" : L.error ? "Status nicht erreichbar" : L.online ? `von ${L.max} Plätzen` : "Server ist offline");
+      set("onlineNow", on.length ? `<div class="online-now">${on.map(n => `<a href="${plink(n)}"><img alt="" src="${head(n)}">${esc(n)}</a>`).join("")}</div>` : `<p class="muted" style="margin:0">${L.checked ? "Gerade ist niemand online." : ""}</p>`);
+      // Welt
+      const w = App.stats?.world;
+      if (w) {
+        const hr = Math.floor((w.time / 1000 + 6) % 24), mi = Math.floor((w.time % 1000) * 0.06);
+        const phase = w.time < 5000 ? "Vormittag" : w.time < 7000 ? "Mittag" : w.time < 12000 ? "Nachmittag" : w.time < 13800 ? "Abend" : w.time < 22500 ? "Nacht" : "Morgen";
+        set("worldList", [["Tag", nf.format(w.day)], ["Uhrzeit", `${String(hr).padStart(2,"0")}:${String(mi).padStart(2,"0")} · ${phase}`], ["Wetter", w.thundering ? "Gewitter" : w.raining ? "Regen" : "Klar"], w.difficulty && ["Schwierigkeit", w.difficulty + (w.hardcore ? " · Hardcore" : "")], w.spawn && ["Spawn", w.spawn.join(" / ")]]
+          .filter(Boolean).map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join(""));
+      } else set("worldList", `<p class="muted small" style="margin:0">Kommt mit dem nächsten Abgleich.</p>`);
+      // Zahlen in Gruppen
+      const has = players().length, V = (k, f) => has ? f(sum(k)) : "–";
+      const groups = [
+        ["Gemeinsam", [["Spieler", has ? players().length : "–"], ["Stunden gespielt", V("play", v => N(v / 72000))], ["Strecke", V("dist", v => N(v / 100000) + " km")]]],
+        ["Kampf", [["Mobs getötet", V("mobs", N)], ["Tode", V("deaths", N)], ["Drachen besiegt", V("dragon", N)]]],
+        ["Bergbau", [["Blöcke abgebaut", V("mined", N)], ["Diamanterz", V("diamond", N)], ["Antiker Schutt", V("debris", N)]]]
+      ];
+      set("statGroups", groups.map(([g, items]) => `<div class="panel stat-group"><span class="eyebrow">${g}</span><div class="sg-items">${items.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join("")}</div></div>`).join(""));
       const ps = players();
       const best = ps.length ? [...ps].sort((a,b) => weekDelta(b,"play") - weekDelta(a,"play"))[0] : null;
       set("potw", best && weekDelta(best, "play") > 0 ? `<div class="potw"><img alt="" src="${body(best.name)}"><div><div class="big"><a href="${plink(best.name)}" style="text-decoration:none">${esc(best.name)}</a></div>
         <div class="muted">${H(weekDelta(best,"play"))} diese Woche gespielt</div><div class="small muted">${N(weekDelta(best,"mined"))} Blöcke · ${N(weekDelta(best,"mobs"))} Mobs · ${N(weekDelta(best,"deaths"))} Tode</div></div></div>`
         : `<p class="muted" style="margin:0">Diese Woche hat noch niemand gespielt.</p>`);
       deathFeedInto("startDeaths", 5);
-      const advs = []; for (const p of ps) for (const [id, t] of advDone(p)) advs.push({ p: p.name, id, t: t || "" });
-      advs.sort((a, b) => b.t.localeCompare(a.t));
-      set("nextEvent", advs.length ? `<div class="feed">${advs.slice(0, 4).map(a => `<div class="fi" style="grid-template-columns:minmax(0,1fr) auto"><span class="tx"><b>${esc(a.p)}</b> · ${esc(advName(a.id))}</span><span class="tm">${a.t ? when(a.t) : ""}</span></div>`).join("")}</div>` : `<p class="muted" style="margin:0">Noch keine Fortschritte erfasst.</p>`);
       recordsInto("startRecords", 6);
       const ch = App.stats?.challenges || [];
       set("startBingo", ch.length && ps.length ? `<div class="feed">${ch.slice(0, 9).map(c => { const who = ps.filter(p => bingoProgress(p, c) >= c.target);

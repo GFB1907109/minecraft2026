@@ -154,7 +154,10 @@ function splitLine(line) {
   const c = rest.match(/^[^\n]*?\[(?:INFO|WARN)\]:?\s(.*)$/);
   if (b && (!a || b[1].length > a[1].length)) msg = b[1]; else if (a) msg = a[1]; else if (c) msg = c[1];
   if (msg == null) return null;
-  return { hms, msg: msg.replace(/\u001b\[[0-9;]*m/g, "").replace(/§./g, "").trim() };
+  msg = msg.replace(/\u001b\[[0-9;]*m/g, "").replace(/§./g, "").trim();
+  // Ab 26.x: "System chat: …", "Player chat: …", "Chat: …" vorne abschneiden
+  msg = msg.replace(/^(?:\[[^\]]*\]\s*)?(?:System chat|Player chat|Chat|Game chat|Server chat):\s*/i, "");
+  return { hms, msg };
 }
 const NAME = "[A-Za-z0-9_]{2,16}";
 const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
@@ -276,7 +279,8 @@ try {
   console.log("Welt:", JSON.stringify(worldData));
 
   // Logs
-  const log = { processed: [], archive: [], current: [], ...(old?.log || {}) };
+  const PARSER = 2;   // bei Änderungen am Log-Lesen erhöhen: dann werden alle Logs neu eingelesen
+  const log = (old?.log && old.log.parser === PARSER) ? { ...old.log } : { parser: PARSER, processed: [], archive: [], current: [] };
   const logs = (await tryList(client, `${root}/logs`)) || [];
   console.log("Log-Dateien:", logs.map(f => f.name).slice(-10).join(", ") || "keine gefunden in " + root + "/logs");
   console.log("Bekannte Spieler:", [...nameSet].join(", ") || "keine (usercache.json fehlt?)");

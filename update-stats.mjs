@@ -23,16 +23,31 @@ async function readText(client, path) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-// Sucht den Server-Ordner, in dem <world>/stats liegt (G-Portal legt ihn je nach Server unterschiedlich ab)
-async function findRoot(client) {
-  const candidates = ["", "minecraft", "server", "home", "data"];
-  for (const base of candidates) {
-    try {
-      const list = await client.list(base ? `/${base}/${WORLD_NAME}` : `/${WORLD_NAME}`);
-      if (list.some(f => f.name === "stats")) return base ? `/${base}` : "";
-    } catch {}
+// Durchsucht den FTP-Zugang nach dem Welt-Ordner (der Ordner mit level.dat).
+// G-Portal legt die Welt je nach Server an unterschiedlichen Stellen ab.
+const SKIP_DIRS = new Set(["mods","config","logs","libraries","versions","crash-reports","region","entities","poi","playerdata","advancements","datapacks","data","DIM-1","DIM1","dimensions","cache",".fabric","resourcepacks","backups"]);
+async function findWorld(client) {
+  const start = (await client.pwd()).replace(/\/$/, "");
+  const seen = [];
+  let queue = [start || ""];
+  for (let depth = 0; depth <= 4 && queue.length; depth++) {
+    const next = [];
+    const found = [];
+    for (const dir of queue) {
+      let list;
+      try { list = await client.list(dir || "/"); } catch { continue; }
+      if (depth <= 1) seen.push(`${dir || "/"}: ${list.map(f => f.name).join(", ")}`);
+      if (list.some(f => f.name === "level.dat") && list.some(f => f.name === "stats")) found.push(dir);
+      for (const f of list) if (f.isDirectory && !SKIP_DIRS.has(f.name) && !f.name.startsWith(".")) next.push(`${dir}/${f.name}`);
+    }
+    if (found.length) {
+      const world = found.find(d => d.endsWith("/" + WORLD_NAME)) || found[0];
+      return { world, root: world.slice(0, world.lastIndexOf("/")) };
+    }
+    queue = next;
   }
-  throw new Error(`Ordner ${WORLD_NAME}/stats nicht gefunden. Prüfe WORLD_NAME oder den FTP-Zugang.`);
+  console.log("Gefundene Ordner:\n" + seen.join("\n"));
+  throw new Error("Welt-Ordner mit level.dat und stats nicht gefunden. Ist schon jemand auf dem Server gewesen?");
 }
 
 const UUID = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.json$/i;
@@ -68,20 +83,20 @@ function extract(uuid, name, s) {
 const client = new Client(30000);
 try {
   await client.access({ host: FTP_HOST, port: Number(FTP_PORT || 21), user: FTP_USER, password: FTP_PASS, secure: FTP_SECURE === "true" });
-  const root = await findRoot(client);
-  console.log("Server-Ordner:", root || "/");
+  const { root, world } = await findWorld(client);
+  console.log("Welt gefunden:", world);
 
   const names = {};
   try {
     JSON.parse(await readText(client, `${root}/usercache.json`)).forEach(e => { names[e.uuid.toLowerCase()] = e.name; });
   } catch { console.warn("usercache.json nicht gefunden – Namen fehlen evtl."); }
 
-  const files = (await client.list(`${root}/${WORLD_NAME}/stats`)).filter(f => UUID.test(f.name));
+  const files = (await client.list(`${world}/stats`)).filter(f => UUID.test(f.name));
   const players = [];
   for (const f of files) {
     const uuid = f.name.match(UUID)[1].toLowerCase();
     try {
-      const data = JSON.parse(await readText(client, `${root}/${WORLD_NAME}/stats/${f.name}`));
+      const data = JSON.parse(await readText(client, `${world}/stats/${f.name}`));
       players.push(extract(uuid, names[uuid] || uuid.slice(0, 8), data.stats || {}));
     } catch (e) { console.warn("Übersprungen:", f.name, e.message); }
   }

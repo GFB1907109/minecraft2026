@@ -13,14 +13,23 @@ if (!FTP_HOST || !FTP_USER || !FTP_PASS) {
 const SKIP = new Set(["session.lock"]);
 let count = 0, failed = 0;
 
-async function findRoot(client) {
-  for (const base of ["", "minecraft", "server", "home", "data"]) {
-    try {
-      const list = await client.list(base ? `/${base}` : "/");
-      if (list.some(f => f.name === WORLD_NAME && f.type === FileType.Directory)) return base ? `/${base}` : "";
-    } catch {}
+// Durchsucht den FTP-Zugang nach dem Welt-Ordner (der Ordner mit level.dat).
+const SKIP_DIRS = new Set(["mods","config","logs","libraries","versions","crash-reports","region","entities","poi","playerdata","advancements","datapacks","data","DIM-1","DIM1","dimensions","cache",".fabric","resourcepacks","backups","stats"]);
+async function findWorld(client) {
+  const start = (await client.pwd()).replace(/\/$/, "");
+  let queue = [start || ""];
+  for (let depth = 0; depth <= 4 && queue.length; depth++) {
+    const next = [], found = [];
+    for (const dir of queue) {
+      let list;
+      try { list = await client.list(dir || "/"); } catch { continue; }
+      if (list.some(f => f.name === "level.dat")) found.push(dir);
+      for (const f of list) if (f.isDirectory && !SKIP_DIRS.has(f.name) && !f.name.startsWith(".")) next.push(`${dir}/${f.name}`);
+    }
+    if (found.length) return found.find(d => d.endsWith("/" + WORLD_NAME)) || found[0];
+    queue = next;
   }
-  throw new Error(`Welt-Ordner "${WORLD_NAME}" nicht gefunden.`);
+  throw new Error("Welt-Ordner mit level.dat nicht gefunden.");
 }
 
 async function walk(client, remote, local) {
@@ -39,9 +48,9 @@ async function walk(client, remote, local) {
 const client = new Client(60000);
 try {
   await client.access({ host: FTP_HOST, port: Number(FTP_PORT || 21), user: FTP_USER, password: FTP_PASS, secure: FTP_SECURE === "true" });
-  const root = await findRoot(client);
-  console.log("Lade Welt aus", `${root}/${WORLD_NAME}`);
-  await walk(client, `${root}/${WORLD_NAME}`, join("download", WORLD_NAME));
+  const world = await findWorld(client);
+  console.log("Lade Welt aus", world);
+  await walk(client, world, join("download", world.split("/").pop() || WORLD_NAME));
   console.log(`Fertig: ${count} Dateien geladen, ${failed} übersprungen.`);
   if (!count) process.exit(1);
 } finally {

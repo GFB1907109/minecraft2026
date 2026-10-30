@@ -22,7 +22,7 @@ const CONFIG = {
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["markt.html", "Markt", 1], ["spiele.html", "Spiele", 1], ["casino.html", "Casino", 1], ["wrapped.html", "Wrapped", 1], ["discord.html", "Discord", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["casino.html", "Casino", 1], ["wrapped.html", "Wrapped", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
@@ -828,7 +828,7 @@ function gameWheel(canvasId, btnId, outId, itemsFn, colors){
     it.forEach((t, i) => {
       const a0 = ang + i * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n;
       ctx.beginPath(); ctx.moveTo(r, r); ctx.arc(r, r, r - 4, a0, a1); ctx.fillStyle = colors[i % colors.length]; ctx.fill();
-      ctx.save(); ctx.translate(r, r); ctx.rotate((a0 + a1) / 2); ctx.fillStyle = "#14101c"; ctx.font = "600 15px Outfit, sans-serif"; ctx.textAlign = "right";
+      ctx.save(); ctx.translate(r, r); ctx.rotate((a0 + a1) / 2); ctx.fillStyle = "#14101c"; ctx.font = "700 " + (it.length > 12 ? 20 : 28) + "px Outfit, sans-serif"; ctx.textAlign = "right";
       ctx.fillText(t.length > 22 ? t.slice(0, 21) + "…" : t, r - 16, 5); ctx.restore();
     });
     ctx.beginPath(); ctx.arc(r, r, 18, 0, 7); ctx.fillStyle = "#1c1426"; ctx.fill();
@@ -860,19 +860,24 @@ function spieleInit(){
 const Bank = {
   get(){ try { const v = localStorage.getItem("mc26_dia"); return v == null ? 100 : +v; } catch { return this._v ?? 100; } },
   set(v){ this._v = Math.max(0, Math.round(v)); try { localStorage.setItem("mc26_dia", this._v); } catch {} Bank.draw(); },
-  draw(){ const v = Bank.get(); document.querySelectorAll(".bank-v").forEach(e => e.textContent = nf.format(v)); const r = $("bankRefill"); if (r) r.hidden = v > 0; }
+  last(){ try { return +localStorage.getItem("mc26_refill") || 0; } catch { return 0; } },
+  wait(){ return Math.max(0, Bank.last() + 24 * 36e5 - Date.now()); },
+  draw(){ const v = Bank.get(); document.querySelectorAll(".bank-v").forEach(e => e.textContent = nf.format(v));
+    const r = $("bankRefill"); if (!r) return; r.hidden = v >= 10;
+    const w = Bank.wait(); r.disabled = w > 0;
+    r.textContent = w > 0 ? (m => `Nachschub in ${Math.floor(m / 60)} Std. ${m % 60} Min.`)(Math.ceil(w / 6e4)) : "Nachschub holen (+30)"; }
 };
 const betOf = id => { const v = Math.floor(+$(id).value || 0); if (v < 1) { $(id).value = 1; return 1; } return v; };
 function casinoMsg(id, txt, good){ const e = $(id); e.textContent = txt; e.className = "cs-msg " + (good ? "good" : good === false ? "bad" : ""); }
 function payable(bet, msgId){ if (bet > Bank.get()) { casinoMsg(msgId, "Nicht genug Diamanten!", false); return false; } return true; }
 
-const SLOT = [["dirt",1,30],["coal",2,24],["iron_ingot",3,18],["gold_ingot",5,12],["emerald",10,8],["diamond",25,5],["netherite_ingot",50,2],["creeper_head",0,6]];
+const SLOT = [["dirt",1,30],["coal",2,22],["iron_ingot",3,16],["gold_ingot",5,10],["emerald",8,6],["diamond",20,4],["netherite_ingot",50,1.5],["creeper_head",0,10]];
 function slotsInit(){
   const reels = [...document.querySelectorAll(".reel")], tot = SLOT.reduce((a, s) => a + s[2], 0);
   const roll = () => { let r = Math.random() * tot; for (const s of SLOT) if ((r -= s[2]) < 0) return s; return SLOT[0]; };
   const img = s => `<img src="${itemImg(s[0])}" alt="${esc(deItem(s[0]))}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fb',textContent:this.alt}))">`;
   reels.forEach(r => r.innerHTML = img(SLOT[5]));
-  $("pt").innerHTML = SLOT.filter(s => s[1]).map(s => `<span>${img(s)}×3 = <b>${s[1]}×</b></span>`).join("") + `<span>2 gleiche = <b>Einsatz zurück</b></span><span>${img(SLOT[7])} = <b>Boom, verloren</b></span>`;
+  $("pt").innerHTML = SLOT.filter(s => s[1]).map(s => `<span>${img(s)}×3 = <b>${s[1]}×</b></span>`).join("") + `<span>2 gleiche = <b>halber Einsatz zurück</b></span><span>${img(SLOT[7])} = <b>Boom, verloren</b></span>`;
   let busy = false;
   $("slotGo").onclick = () => {
     if (busy) return; const bet = betOf("slotBet"); if (!payable(bet, "slotMsg")) return;
@@ -884,7 +889,7 @@ function slotsInit(){
           const ids = res.map(x => x[0]);
           if (ids.includes("creeper_head")) casinoMsg("slotMsg", "💥 Creeper! Alles weg.", false);
           else if (ids[0] === ids[1] && ids[1] === ids[2]) { const w = bet * res[0][1]; Bank.set(Bank.get() + w); casinoMsg("slotMsg", `JACKPOT! +${nf.format(w)} 💎`, true); confetti(); }
-          else if (new Set(ids).size === 2) { Bank.set(Bank.get() + bet); casinoMsg("slotMsg", "Zwei gleiche: Einsatz zurück.", null); }
+          else if (new Set(ids).size === 2) { const w = Math.floor(bet / 2); Bank.set(Bank.get() + w); casinoMsg("slotMsg", `Zwei gleiche: halber Einsatz zurück (+${w}).`, null); }
           else casinoMsg("slotMsg", "Leider nichts.", false);
         } }, 700 + i * 450); });
   };
@@ -899,14 +904,14 @@ function coinInit(){
     Bank.set(Bank.get() - bet); const res = Math.random() < .5 ? "steve" : "creeper";
     coin.className = "coin flip " + res; casinoMsg("coinMsg", "…");
     setTimeout(() => { coin.className = "coin " + res;
-      if (res === pick) { Bank.set(Bank.get() + bet * 2); casinoMsg("coinMsg", `Gewonnen! +${nf.format(bet * 2)} 💎`, true); }
+      if (res === pick) { const w = Math.floor(bet * 1.9); Bank.set(Bank.get() + w); casinoMsg("coinMsg", `Gewonnen! +${nf.format(w)} 💎`, true); }
       else casinoMsg("coinMsg", "Verloren!", false); }, 1600);
   };
 }
 
 function minesInit(){
   const grid = $("mGrid"); let st = null;
-  const mult = safe => { const n = 25, b = st.bombs; let m = 1; for (let i = 0; i < safe; i++) m *= (n - i) / (n - b - i); return m * .97; };
+  const mult = safe => { const n = 25, b = st.bombs; let m = 1; for (let i = 0; i < safe; i++) m *= (n - i) / (n - b - i); return m * .9; };
   const draw = () => {
     grid.innerHTML = Array.from({ length: 25 }, (_, i) => { const o = st?.open.has(i), bomb = st?.bombSet.has(i), show = o || (st?.over && bomb);
       return `<button type="button" class="mc ${show ? (bomb ? "boom" : "ok") : ""}" data-i="${i}" ${!st || st.over || o ? "disabled" : ""}>${show ? (bomb ? `<img src="${itemImg("tnt")}" alt="TNT">` : `<img src="${itemImg("diamond")}" alt="Diamant">`) : ""}</button>`; }).join("");
@@ -982,21 +987,40 @@ function bjInit(){
     if (live && (me.length > 2 || Bank.get() < bet)) $("bjDouble").disabled = true;
     $("bjGo").disabled = live;
   };
-  const end = (txt, mult) => { live = false; if (mult) Bank.set(Bank.get() + Math.floor(bet * mult)); casinoMsg("bjMsg", txt + (mult ? ` +${nf.format(Math.floor(bet * mult))} 💎` : ""), mult > 1 ? true : mult === 1 ? null : false); if (mult >= 2.5) confetti(); show(false); };
+  const end = (txt, mult) => { live = false; if (mult) Bank.set(Bank.get() + Math.floor(bet * mult)); casinoMsg("bjMsg", txt + (mult ? ` +${nf.format(Math.floor(bet * mult))} 💎` : ""), mult > 1 ? true : mult === 1 ? null : false); if (mult > 2) confetti(); show(false); };
   const dealerPlay = () => { while (score(dl) < 17) dl.push(draw1()); const d = score(dl), m = score(me);
     if (d > 21) end("Der Händler hat sich übernommen!", 2); else if (m > d) end("Du gewinnst!", 2); else if (m === d) end("Unentschieden.", 1); else end(`Händler hat ${d}. Verloren.`, 0); };
   $("bjGo").onclick = () => { bet = betOf("bjBet"); if (!payable(bet, "bjMsg")) return; Bank.set(Bank.get() - bet);
     me = [draw1(), draw1()]; dl = [draw1(), draw1()]; live = true; casinoMsg("bjMsg", "Karte ziehen oder stehen bleiben?"); show(true);
-    if (score(me) === 21) { score(dl) === 21 ? end("Beide 21. Unentschieden.", 1) : end("CREEPER 21! Natürlicher Blackjack!", 2.5); } };
+    if (score(me) === 21) { score(dl) === 21 ? end("Beide 21. Unentschieden.", 1) : end("CREEPER 21! Natürlicher Blackjack!", 2.2); } };
   $("bjHit").onclick = () => { me.push(draw1()); const m = score(me); show(true); if (m > 21) end(`💥 ${m}, explodiert! Verloren.`, 0); else if (m === 21) dealerPlay(); };
   $("bjStand").onclick = () => dealerPlay();
   $("bjDouble").onclick = () => { if (Bank.get() < bet) return; Bank.set(Bank.get() - bet); bet *= 2; me.push(draw1()); const m = score(me); if (m > 21) end(`💥 ${m}, explodiert! Verloren.`, 0); else dealerPlay(); };
   newDeck(); show(false);
 }
 
+/* ---------- Glücksrad & Lose ziehen ---------- */
+function luckInit(){
+  const ta = $("luckList"); let draw;
+  const load = () => { try { return localStorage.getItem("mc26_luck"); } catch { return null; } };
+  ta.value = load() || players().map(p => p.name).join("\n") || "Sulaiii\nGFB1907\nMattheus05\nmoo259\nInsider07\nDiddylikeapiddy";
+  const items = () => ta.value.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 30);
+  ta.oninput = () => { try { localStorage.setItem("mc26_luck", ta.value); } catch {} draw(); $("lotList").innerHTML = ""; };
+  draw = gameWheel("luckWheel", "luckGo", "luckOut", () => items().length ? items() : ["?"], ["#7bd34f","#f5c542","#e2557b","#5ad1f0","#b38cf5","#ffa14a","#4fd1a5","#f08a5d"]);
+  document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+    ta.value = b.dataset.preset === "spieler" ? (players().map(p => p.name).join("\n") || ta.value) : b.dataset.preset.split("|").join("\n"); ta.oninput(); });
+  $("lotGo").onclick = () => {
+    const list = shuffle(items()); if (!list.length) return;
+    const n = Math.min(list.length, Math.max(1, +$("lotN").value || 1));
+    $("lotList").innerHTML = list.slice(0, n).map((x, i) => `<div class="lot" style="animation-delay:${i * .25}s"><span>${i + 1}.</span><b>${esc(x)}</b></div>`).join("");
+  };
+}
+
 function casinoInit(){
   slotsInit(); rouletteInit(); bjInit(); coinInit(); minesInit(); Bank.draw();
-  $("bankRefill").onclick = () => { Bank.set(100); };
+  $("bankRefill").onclick = () => { if (Bank.wait() > 0) return; try { localStorage.setItem("mc26_refill", Date.now()); } catch {} Bank.set(Bank.get() + 30); };
+  setInterval(Bank.draw, 30000);
+  luckInit();
   document.querySelectorAll("[data-bet]").forEach(b => b.onclick = () => { const inp = $(b.dataset.for), v = b.dataset.bet;
     inp.value = v === "max" ? Math.max(1, Bank.get()) : v === "half" ? Math.max(1, Math.floor(+inp.value / 2)) : Math.max(1, (+inp.value || 0) * 2); });
 }
@@ -1209,8 +1233,6 @@ const PAGE_INIT = {
   },
 
   casino(){ casinoInit(); },
-  spiele(){ onUpdate(spieleInit); },
-  markt(){ marktBuilder(); $("marktFilter").addEventListener("change", marktInto); onUpdate(marktInto); },
   bingo(){ $("bingoPlayer").addEventListener("change", bingoInto); onUpdate(bingoInto); },
 
   events(){

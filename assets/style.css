@@ -572,3 +572,14 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 .card.back{background:repeating-linear-gradient(45deg,#6d8f3a 0 8px,#5c4630 8px 16px);border:3px solid #f4efe6}
 @keyframes deal{from{transform:translateY(-20px);opacity:0}}
 .bj-btns{display:flex;gap:.4rem;flex-wrap:wrap}.g-btn:disabled{opacity:.4;cursor:default}
+
+.luck{grid-column:1/-1}
+.luck-grid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));align-items:start}
+#luckList{width:100%;min-height:180px;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.6rem .8rem;resize:vertical}
+.presets{display:flex;flex-wrap:wrap;gap:.35rem;margin:.5rem 0}.presets .g-btn{padding:.35rem .65rem;font-size:.8rem}
+.lots{display:grid;gap:.4rem;margin-top:.8rem}
+.lot{display:flex;gap:.6rem;align-items:center;padding:.6rem .9rem;border-radius:10px;background:#f4efe6;color:#1c1426;font-size:1.05rem;animation:lot .5s ease-out both}
+.lot span{font:800 .9rem var(--f-mono,monospace);color:#b3261e}
+@keyframes lot{from{transform:rotateX(90deg);opacity:0}}
+#lotN{width:4.5rem;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.45rem .6rem}
+#bankRefill:disabled{background:rgba(255,255,255,.08);color:inherit;opacity:.8}

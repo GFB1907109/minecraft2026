@@ -874,64 +874,60 @@ function payable(bet, msgId){ if (bet > Bank.get()) { casinoMsg(msgId, "Nicht ge
 
 const SLOT = [["dirt",1,30],["coal",2,22],["iron_ingot",3,16],["gold_ingot",5,10],["emerald",8,6],["diamond",20,4],["netherite_ingot",50,1.5],["creeper_head",0,10]];
 function slotsInit(){
-  const reels = [...document.querySelectorAll(".reel")], tot = SLOT.reduce((a, s) => a + s[2], 0);
+  const tot = SLOT.reduce((a, s) => a + s[2], 0);
   const roll = () => { let r = Math.random() * tot; for (const s of SLOT) if ((r -= s[2]) < 0) return s; return SLOT[0]; };
   const img = s => `<img src="${itemImg(s[0])}" alt="${esc(deItem(s[0]))}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fb',textContent:this.alt}))">`;
-  reels.forEach(r => r.innerHTML = img(SLOT[5]));
+  const FACES = 16, step = 360 / FACES;
+  const drums = [...document.querySelectorAll(".drum")];
+  const state = drums.map(() => ({ rot: 0, faces: [] }));
+  drums.forEach((d, k) => {
+    const h = d.parentElement.clientHeight || 120, r = Math.round(h / 2 / Math.tan(Math.PI / FACES)) + 2;
+    d.style.setProperty("--r", r + "px");
+    state[k].faces = Array.from({ length: FACES }, (_, i) => SLOT[(i + k * 3) % SLOT.length]);
+    d.innerHTML = state[k].faces.map((s, i) => `<div class="face" style="transform:rotateX(${-i * step}deg) translateZ(${r}px)">${img(s)}</div>`).join("");
+  });
   $("pt").innerHTML = SLOT.filter(s => s[1]).map(s => `<span>${img(s)}×3 = <b>${s[1]}×</b></span>`).join("") + `<span>2 gleiche = <b>halber Einsatz zurück</b></span><span>${img(SLOT[7])} = <b>Boom, verloren</b></span>`;
   let busy = false;
   $("slotGo").onclick = () => {
     if (busy) return; const bet = betOf("slotBet"); if (!payable(bet, "slotMsg")) return;
-    busy = true; Bank.set(Bank.get() - bet); casinoMsg("slotMsg", "…");
+    busy = true; Bank.set(Bank.get() - bet); casinoMsg("slotMsg", "…"); $("slotLever").classList.remove("pull"); void $("slotLever").offsetWidth; $("slotLever").classList.add("pull");
     const res = [roll(), roll(), roll()];
-    reels.forEach((r, i) => { r.classList.add("spin"); const t = setInterval(() => { r.innerHTML = img(rnd(SLOT)); Sound.play("tick"); }, 80);
-      setTimeout(() => { clearInterval(t); r.classList.remove("spin"); r.innerHTML = img(res[i]);
-        if (i === 2) { busy = false;
-          const ids = res.map(x => x[0]);
-          if (ids.includes("creeper_head")) casinoMsg("slotMsg", "💥 Creeper! Alles weg.", false);
-          else if (ids[0] === ids[1] && ids[1] === ids[2]) { const w = bet * res[0][1]; Bank.set(Bank.get() + w); casinoMsg("slotMsg", `JACKPOT! +${nf.format(w)} 💎`, true); confetti(); }
-          else if (new Set(ids).size === 2) { const w = Math.floor(bet / 2); Bank.set(Bank.get() + w); casinoMsg("slotMsg", `Zwei gleiche: halber Einsatz zurück (+${w}).`, null); }
-          else casinoMsg("slotMsg", "Leider nichts.", false);
-        } }, 700 + i * 450); });
+    drums.forEach((d, k) => {
+      const st = state[k], cur = Math.round(st.rot / step), target = cur + FACES * (3 + k) + ((FACES - ((cur + FACES * 99) % FACES)) % FACES) + 4;
+      const idx = ((target % FACES) + FACES) % FACES; st.faces[idx] = res[k];
+      d.children[idx].innerHTML = img(res[k]);
+      st.rot = target * step;
+      d.style.transition = `transform ${1.6 + k * .55}s cubic-bezier(.2,.75,.25,1.04)`;
+      d.style.transform = `rotateX(${st.rot}deg)`;
+      let n = 0; const tk = setInterval(() => { Sound.play("tick"); if (++n > 10 + k * 4) clearInterval(tk); }, 110);
+    });
+    setTimeout(() => { busy = false;
+      const ids = res.map(x => x[0]);
+      document.querySelectorAll(".reel3d").forEach(r => r.classList.remove("hit"));
+      if (ids.includes("creeper_head")) { casinoMsg("slotMsg", "💥 Creeper! Alles weg.", false); $("slotMachine").classList.add("shake"); setTimeout(() => $("slotMachine").classList.remove("shake"), 600); }
+      else if (ids[0] === ids[1] && ids[1] === ids[2]) { const w = bet * res[0][1]; Bank.set(Bank.get() + w); casinoMsg("slotMsg", `JACKPOT! +${nf.format(w)} 💎`, true); confetti(); document.querySelectorAll(".reel3d").forEach(r => r.classList.add("hit")); }
+      else if (new Set(ids).size === 2) { const w = Math.floor(bet / 2); Bank.set(Bank.get() + w); casinoMsg("slotMsg", `Zwei gleiche: halber Einsatz zurück (+${w}).`, null); }
+      else casinoMsg("slotMsg", "Leider nichts.", false);
+    }, 1600 + 2 * 550 + 150);
   };
 }
 
 function coinInit(){
-  let pick = "steve";
+  let pick = "steve", rot = 0, busy = false;
   document.querySelectorAll("[data-side]").forEach(b => b.onclick = () => { pick = b.dataset.side; document.querySelectorAll("[data-side]").forEach(x => x.classList.toggle("on", x === b)); });
   $("coinGo").onclick = () => {
-    const bet = betOf("coinBet"); if (!payable(bet, "coinMsg")) return;
-    const coin = $("coin"); if (coin.classList.contains("flip")) return;
-    Bank.set(Bank.get() - bet); const res = Math.random() < .5 ? "steve" : "creeper";
-    coin.className = "coin flip " + res; casinoMsg("coinMsg", "…"); Sound.play("flip");
-    setTimeout(() => { coin.className = "coin " + res;
-      if (res === pick) { const w = Math.floor(bet * 1.9); Bank.set(Bank.get() + w); casinoMsg("coinMsg", `Gewonnen! +${nf.format(w)} 💎`, true); }
-      else casinoMsg("coinMsg", "Verloren!", false); }, 1600);
+    if (busy) return; const bet = betOf("coinBet"); if (!payable(bet, "coinMsg")) return;
+    busy = true; Bank.set(Bank.get() - bet); const res = Math.random() < .5 ? "steve" : "creeper";
+    rot += 1800 + ((res === "creeper") !== (Math.round(rot / 180) % 2 === 1) ? 180 : 0);
+    $("coin3d").style.transform = `translateY(0) rotateY(${rot}deg)`;
+    $("coinToss").classList.remove("toss"); void $("coinToss").offsetWidth; $("coinToss").classList.add("toss");
+    casinoMsg("coinMsg", "…"); Sound.play("flip");
+    const c3 = $("coin3d"); let fl = 0; const iv = setInterval(() => c3.classList.toggle("cr", ++fl % 2 === 1), 90);
+    setTimeout(() => { clearInterval(iv); c3.classList.toggle("cr", res === "creeper"); }, 1550);
+    setTimeout(() => { busy = false;
+      if (res === pick) { const w = Math.floor(bet * 1.9); Bank.set(Bank.get() + w); casinoMsg("coinMsg", `${res === "steve" ? "Steve" : "Creeper"}! Gewonnen: +${nf.format(w)} 💎`, true); }
+      else casinoMsg("coinMsg", `${res === "steve" ? "Steve" : "Creeper"}. Verloren!`, false); }, 1700);
   };
-}
-
-function minesInit(){
-  const grid = $("mGrid"); let st = null;
-  const mult = safe => { const n = 25, b = st.bombs; let m = 1; for (let i = 0; i < safe; i++) m *= (n - i) / (n - b - i); return m * .9; };
-  const draw = () => {
-    grid.innerHTML = Array.from({ length: 25 }, (_, i) => { const o = st?.open.has(i), bomb = st?.bombSet.has(i), show = o || (st?.over && bomb);
-      return `<button type="button" class="mc ${show ? (bomb ? "boom" : "ok") : ""}" data-i="${i}" ${!st || st.over || o ? "disabled" : ""}>${show ? (bomb ? `<img src="${itemImg("tnt")}" alt="TNT">` : `<img src="${itemImg("diamond")}" alt="Diamant">`) : ""}</button>`; }).join("");
-    const safe = st ? st.open.size : 0;
-    $("mCash").disabled = !st || st.over || !safe;
-    $("mInfo").textContent = st && !st.over ? `Gefunden: ${safe} · Auszahlen: ${nf.format(Math.floor(st.bet * mult(safe)))} 💎 · Nächstes Feld: ${nf1.format(mult(safe + 1))}×` : "";
-  };
-  $("mGo").onclick = () => {
-    const bet = betOf("mBet"); if (!payable(bet, "mMsg")) return;
-    const bombs = +$("mBombs").value; Bank.set(Bank.get() - bet);
-    const bombSet = new Set(shuffle([...Array(25).keys()]).slice(0, bombs));
-    st = { bet, bombs, bombSet, open: new Set(), over: false }; casinoMsg("mMsg", "Klick auf ein Feld. Vorsicht vor TNT!"); draw();
-  };
-  grid.onclick = e => { const b = e.target.closest(".mc"); if (!b || !st || st.over) return; const i = +b.dataset.i;
-    if (st.bombSet.has(i)) { st.over = true; st.open.add(i); casinoMsg("mMsg", "💥 TNT! Einsatz verloren.", false); }
-    else { st.open.add(i); Sound.play("dig"); if (st.open.size === 25 - st.bombs) { const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Alles gefunden! +${nf.format(w)} 💎`, true); confetti(); } }
-    draw(); };
-  $("mCash").onclick = () => { if (!st || st.over) return; const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Ausgezahlt: +${nf.format(w)} 💎`, true); draw(); };
-  draw();
 }
 
 /* Roulette: Redstone = rot, Kohle = schwarz, Smaragd = 0 */
@@ -979,10 +975,13 @@ function bjInit(){
   const newDeck = () => { deck = shuffle(SUITS.flatMap(s => RANKS.map(r => ({ s, r })))); };
   const draw1 = () => { if (deck.length < 12) newDeck(); return deck.pop(); };
   const score = h => { let t = h.reduce((a, c) => a + c.r[1], 0), aces = h.filter(c => c.r[0] === "A").length; while (t > 21 && aces--) t -= 10; return t; };
-  const card = (c, hide) => hide ? `<div class="card back"></div>` : `<div class="card ${c.s[0]}"><b>${c.r[0]}</b><img src="${itemImg(c.s[0])}" alt="${c.s[1]}"><b class="rot">${c.r[0]}</b></div>`;
+  const card = (c, hide, i) => `<div class="card3d${hide ? "" : " up"}" style="--d:${i * .12}s"><div class="cface front ${c.s[0]}"><b>${c.r[0]}</b><img src="${itemImg(c.s[0])}" alt="${c.s[1]}"><b class="rot">${c.r[0]}</b></div><div class="cface backside"></div></div>`;
   const show = (hideDealer) => {
-    Sound.play("card"); $("bjDealer").innerHTML = dl.map((c, i) => card(c, hideDealer && i === 1)).join("");
-    $("bjMe").innerHTML = me.map(c => card(c)).join("");
+    Sound.play("card"); const sync = (el, hand, hide) => { const ex = el.children; if (ex.length > hand.length) el.innerHTML = "";
+      hand.forEach((c, i) => { if (ex[i]) { if (!(hide && i === 1)) requestAnimationFrame(() => ex[i].classList.add("up")); return; }
+        el.insertAdjacentHTML("beforeend", card(c, true, i - ex.length + 1)); const n = el.lastElementChild; if (!(hide && i === 1)) setTimeout(() => n.classList.add("up"), 380 + (i - 0) * 60); }); };
+    sync($("bjDealer"), dl, hideDealer);
+    sync($("bjMe"), me, false);
     $("bjDs").textContent = hideDealer ? "?" : score(dl); $("bjMs").textContent = me.length ? score(me) : "";
     $("bjHit").disabled = $("bjStand").disabled = $("bjDouble").disabled = !live;
     if (live && (me.length > 2 || Bank.get() < bet)) $("bjDouble").disabled = true;
@@ -992,7 +991,7 @@ function bjInit(){
   const dealerPlay = () => { while (score(dl) < 17) dl.push(draw1()); const d = score(dl), m = score(me);
     if (d > 21) end("Der Händler hat sich übernommen!", 2); else if (m > d) end("Du gewinnst!", 2); else if (m === d) end("Unentschieden.", 1); else end(`Händler hat ${d}. Verloren.`, 0); };
   $("bjGo").onclick = () => { bet = betOf("bjBet"); if (!payable(bet, "bjMsg")) return; Bank.set(Bank.get() - bet);
-    me = [draw1(), draw1()]; dl = [draw1(), draw1()]; live = true; casinoMsg("bjMsg", "Karte ziehen oder stehen bleiben?"); show(true);
+    me = [draw1(), draw1()]; dl = [draw1(), draw1()]; live = true; $("bjDealer").innerHTML = $("bjMe").innerHTML = ""; casinoMsg("bjMsg", "Karte ziehen oder stehen bleiben?"); show(true);
     if (score(me) === 21) { score(dl) === 21 ? end("Beide 21. Unentschieden.", 1) : end("CREEPER 21! Natürlicher Blackjack!", 2.2); } };
   $("bjHit").onclick = () => { me.push(draw1()); const m = score(me); show(true); if (m > 21) end(`💥 ${m}, explodiert! Verloren.`, 0); else if (m === 21) dealerPlay(); };
   $("bjStand").onclick = () => dealerPlay();
@@ -1017,8 +1016,16 @@ function luckInit(){
   };
 }
 
+function casinoTabs(){
+  const tabs = [...document.querySelectorAll(".cs-tab")], panels = [...document.querySelectorAll(".cs-game")];
+  const show = id => { tabs.forEach(t => t.classList.toggle("on", t.dataset.g === id)); panels.forEach(p => { const on = p.id === id; p.hidden = !on; if (on) { p.classList.remove("enter"); void p.offsetWidth; p.classList.add("enter"); } });
+    try { localStorage.setItem("mc26_game", id); } catch {} };
+  tabs.forEach(t => t.onclick = () => show(t.dataset.g));
+  let start = "gLuck"; try { start = localStorage.getItem("mc26_game") || start; } catch {}
+  show(panels.some(p => p.id === start) ? start : "gLuck");
+}
 function casinoInit(){
-  slotsInit(); rouletteInit(); bjInit(); coinInit(); minesInit(); Bank.draw();
+  slotsInit(); rouletteInit(); bjInit(); coinInit(); casinoTabs(); Bank.draw();
   $("bankRefill").onclick = () => { if (Bank.wait() > 0) return; try { localStorage.setItem("mc26_refill", Date.now()); } catch {} Bank.set(Bank.get() + 30); };
   setInterval(Bank.draw, 30000);
   luckInit();

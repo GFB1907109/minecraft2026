@@ -178,9 +178,17 @@ const STATS = [
   { key:"boat",    g:"Welt", label:"Boot gefahren", fmt:KM },
   { key:"jumps",   g:"Welt", label:"Sprünge", fmt:N },
   { key:"fish",    g:"Welt", label:"Fische gefangen", fmt:N, rec:"Bester Angler" },
-  { key:"bred",    g:"Welt", label:"Tiere gezüchtet", fmt:N, rec:"Bauer des Jahres" },
   { key:"trades",  g:"Welt", label:"Mit Dorfbewohnern gehandelt", fmt:N, rec:"Händler" },
   { key:"enchant", g:"Welt", label:"Items verzaubert", fmt:N },
+  { key:"bred",    g:"Tiere", label:"Tiere gezüchtet",    fmt:N,  rec:"Bester Züchter" },
+  { key:"horse",   g:"Tiere", label:"Pferd geritten",     fmt:KM, rec:"Bester Reiter" },
+  { key:"pig",     g:"Tiere", label:"Schwein geritten",   fmt:KM },
+  { key:"strider", g:"Tiere", label:"Strider geritten",   fmt:KM },
+  { key:"ghast",   g:"Tiere", label:"Mit Happy Ghast geflogen", fmt:KM },
+  { key:"sheared", g:"Tiere", label:"Schafe geschoren",   fmt:N },
+  { key:"leads",   g:"Tiere", label:"Leinen benutzt",     fmt:N },
+  { key:"eggs",    g:"Tiere", label:"Eier geworfen",      fmt:N },
+  { key:"animalKills", g:"Tiere", label:"Nutztiere geschlachtet", fmt:N, rec:"Metzger" },
 ];
 const GROUPS = [...new Set(STATS.map(s => s.g))];
 const val = (p, k) => k === "kd" ? ((p.mobs||0) + (p.pvp||0)) / Math.max(1, p.deaths||0) : (p[k] || 0);
@@ -1134,7 +1142,7 @@ const Sound = {
 const PAGE_INIT = {
 
   start(){
-    stars(); countdown3d();
+    stars(); countdown3d(); onUpdate(podiumInto);
     const parts = CONFIG.name.split(" "); const last = parts.pop();
     $("heroTitle").innerHTML = esc(parts.join(" ")) + (parts.length ? " " : "") + `<em>${esc(last)}</em>`;
     $("copyBtn").addEventListener("click", async () => {
@@ -1191,6 +1199,8 @@ const PAGE_INIT = {
       const real = p ? p.name : name;
       document.title = `${real} · ${CONFIG.name}`;
       set("pName", esc(real)); $("pSkin").src = body(real);
+      if ($("pSkin3d") && $("pSkin3d").dataset.n !== real) { $("pSkin3d").dataset.n = real; const cv = document.createElement("canvas"); $("pSkin3d").querySelector("canvas")?.remove(); $("pSkin3d").prepend(cv); $("pSkin3d").classList.remove("ready", "failed");
+        Skin3D.make(cv, real, { w: 240, h: 320, anim: isOnline(real) ? "walk" : "idle" }).then(v => { if (!v) return; const an = $("pAnim"); if (an) an.onclick = e => { const b = e.target.closest("[data-a]"); if (!b) return; const sv = window.skinview3d, M = { walk: sv.WalkingAnimation, run: sv.RunningAnimation, wave: sv.WaveAnimation, fly: sv.FlyingAnimation, idle: sv.IdleAnimation }; if (M[b.dataset.a]) v.animation = new M[b.dataset.a](); an.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); }; }); }
       const pr = p && App.stats.profiles?.[p.uuid];
       const on = isOnline(real), seen = lastSeen()[real];
       set("pState", on ? "● Gerade online" : "Spielerprofil");
@@ -1227,7 +1237,7 @@ const PAGE_INIT = {
     });
   },
 
-  stats(){
+  stats(){ onUpdate(raceInit); onUpdate(animalsInto);
     onUpdate(() => {
       const d = App.stats?.updated ? new Date(App.stats.updated) : null;
       set("statsInfo", players().length ? `Stand: ${d ? d.toLocaleString("de-DE",{dateStyle:"medium",timeStyle:"short"}) : "unbekannt"}. Klick auf einen Spieler für sein Profil.` : "Noch keine Welt-Stats geladen.");
@@ -1763,6 +1773,123 @@ function countdown3d(){
     $("cityCopy").onclick = async () => { try { await navigator.clipboard.writeText(`${c.x} ${c.y} ${c.z}`); $("cityCopy").textContent = "Kopiert ✓"; setTimeout(() => $("cityCopy").textContent = "Koordinaten kopieren", 1800); } catch {} };
   }
 }
+
+/* ---------- 3D-Skins (skinview3d) ---------- */
+const Skin3D = {
+  lib: null,
+  load(){ if (this.lib) return this.lib; return this.lib = new Promise((ok, no) => { if (window.skinview3d) return ok(window.skinview3d);
+    const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/skinview3d@3.4.2/bundles/skinview3d.bundle.js";
+    sc.onload = () => window.skinview3d ? ok(window.skinview3d) : no(); sc.onerror = no; document.head.appendChild(sc); }); },
+  urls(n){ const p = players().find(x => lc(x.name) === lc(n)), id = p ? p.uuid.replace(/-/g, "") : encodeURIComponent(n);
+    return [`https://mc-heads.net/skin/${id}`, `https://crafatar.com/skins/${id}`, `https://minotar.net/skin/${encodeURIComponent(n)}`]; },
+  async make(canvas, name, { w = 260, h = 340, anim = "walk", rotate = true, zoom = .9, crown = false } = {}){
+    try {
+      const sv = await this.load();
+      const v = new sv.SkinViewer({ canvas, width: w, height: h });
+      v.zoom = zoom; v.fov = 55; v.autoRotate = rotate; v.autoRotateSpeed = .6;
+      if (v.controls) { v.controls.enableZoom = false; v.controls.enablePan = false; }
+      const A = { walk: sv.WalkingAnimation, run: sv.RunningAnimation, wave: sv.WaveAnimation || sv.WalkingAnimation, idle: sv.IdleAnimation || sv.WalkingAnimation, fly: sv.FlyingAnimation };
+      if (A[anim]) { v.animation = new A[anim](); v.animation.speed = anim === "idle" ? 1 : .7; }
+      let ok = false; for (const u of this.urls(name)) { try { await v.loadSkin(u); ok = true; break; } catch {} }
+      if (!ok) throw 0;
+      canvas.closest(".sk3d")?.classList.add("ready");
+      return v;
+    } catch { canvas.closest(".sk3d")?.classList.add("failed"); return null; }
+  }
+};
+function podiumInto(){
+  const box = $("podium"); if (!box || !App.stats || box.dataset.done === JSON.stringify(players().map(p => p.name))) return;
+  const ps = players(); if (!ps.length) return;
+  const wk = ps.some(p => weekDelta(p, "play") > 0), score = p => wk ? weekDelta(p, "play") : val(p, "play");
+  const top = ps.slice().sort((a, b) => score(b) - score(a)).slice(0, 3);
+  box.dataset.done = JSON.stringify(players().map(p => p.name));
+  set("podiumSub", wk ? "Die meiste Spielzeit diese Woche" : "Die meiste Spielzeit insgesamt");
+  const order = [1, 0, 2].filter(i => top[i]);
+  box.innerHTML = order.map(i => { const p = top[i]; return `<div class="pod pod${i + 1}"><a href="${plink(p.name)}" class="sk3d"><canvas></canvas><img src="${body(p.name)}" alt="${esc(p.name)}">${i === 0 ? '<span class="crown">👑</span>' : ""}</a>
+    <div class="pod-step"><b>${i + 1}</b><span>${esc(p.name)}</span><small>${H(score(p))}</small></div></div>`; }).join("");
+  order.forEach((i, k) => Skin3D.make(box.children[k].querySelector("canvas"), top[i].name, { w: 200, h: 260, anim: i === 0 ? "wave" : "idle", rotate: false, zoom: .95 })
+    .then(v => { if (v) v.playerObject.rotation.y = i === 1 ? .45 : i === 2 ? -.45 : 0; }));
+}
+
+/* ---------- Rangliste als Rennen ---------- */
+function raceInit(){
+  const box = $("race"); if (!box) return;
+  const metrics = [["play","Spielzeit"],["mined","Blöcke abgebaut"],["mobs","Mobs getötet"],["deaths","Tode"],["diamond","Diamanterz"],["dist","Strecke"]];
+  const sel = $("raceMetric"); if (!sel.options.length) sel.innerHTML = metrics.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+  let raf = null, playing = false;
+  const fmtK = k => STATS.find(s => s.key === k)?.fmt || N;
+  const frames = () => {
+    const days = hDays(), k = sel.value, i = hIndex(k);
+    return days.map(d => ({ d, v: Object.fromEntries(players().map(p => [p.name, App.stats.history[d]?.[p.uuid]?.[i] ?? null])) }))
+      .concat([{ d: "heute", v: Object.fromEntries(players().map(p => [p.name, val(p, k)])) }]);
+  };
+  const draw = (fr, t) => {
+    const a = fr[Math.floor(t)], b = fr[Math.min(fr.length - 1, Math.floor(t) + 1)], f = t % 1, k = sel.value;
+    const rows = players().map(p => { const va = a.v[p.name] ?? 0, vb = b.v[p.name] ?? va; return { n: p.name, v: va + (vb - va) * f }; }).sort((x, y) => y.v - x.v);
+    const max = Math.max(1, rows[0]?.v || 1);
+    $("raceDay").textContent = b.d === "heute" && f > .5 ? "Heute" : new Date(a.d).toLocaleDateString("de-DE", { day: "numeric", month: "long" });
+    const H_ = 46;
+    box.style.height = rows.length * H_ + "px";
+    for (const [i, r] of rows.entries()) {
+      let el = box.querySelector(`[data-n="${CSS.escape(r.n)}"]`);
+      if (!el) { el = document.createElement("div"); el.className = "rbar"; el.dataset.n = r.n; el.innerHTML = `<img alt="" src="${head(r.n)}"><div class="rfill"><b>${esc(r.n)}</b></div><span></span>`; box.appendChild(el); }
+      el.style.transform = `translateY(${i * H_}px)`;
+      el.querySelector(".rfill").style.width = `calc(${Math.max(2, r.v / max * 100)}% - 0px)`;
+      el.querySelector("span").textContent = fmtK(k)(r.v);
+      el.classList.toggle("lead", i === 0);
+    }
+  };
+  const stop = () => { cancelAnimationFrame(raf); playing = false; $("racePlay").textContent = "▶ Rennen starten"; };
+  const play = () => {
+    const fr = frames(); if (fr.length < 2) { draw(fr, 0); $("raceInfo").textContent = "Das Rennen braucht Daten von mindestens einem Tag. Ab morgen geht's los!"; return; }
+    $("raceInfo").textContent = ""; playing = true; $("racePlay").textContent = "⏸ Pause";
+    const dur = Math.min(20000, Math.max(5000, fr.length * 900)), t0 = performance.now();
+    const step = now => { const t = Math.min(1, (now - t0) / dur) * (fr.length - 1); draw(fr, Math.min(t, fr.length - 1.0001)); if (t < fr.length - 1 && playing) raf = requestAnimationFrame(step); else stop(); };
+    raf = requestAnimationFrame(step);
+  };
+  $("racePlay").onclick = () => playing ? stop() : play();
+  sel.onchange = () => { stop(); box.innerHTML = ""; const fr = frames(); draw(fr, fr.length - 1.0001); };
+  if (App.stats) { box.innerHTML = ""; const fr = frames(); draw(fr, Math.max(0, fr.length - 1.0001)); if (fr.length < 2) $("raceInfo").textContent = "Das Rennen braucht Daten von mindestens einem Tag. Ab morgen geht's los!"; }
+}
+
+/* ---------- Tier-Ecke ---------- */
+function animalsInto(){
+  const box = $("animals"); if (!box || !App.stats) return;
+  const ps = players();
+  const cards = [["bred","🐄","Bester Züchter"],["horse","🐎","Bester Reiter"],["pig","🐖","Schweine-Jockey"],["strider","🔥","Strider-Fahrer"],["ghast","👻","Happy-Ghast-Pilot"],["sheared","🐑","Schafscherer"],["leads","🪢","Leinen-Profi"],["eggs","🥚","Eierwerfer"],["animalKills","🍖","Metzger"]];
+  const tame = [["husbandry/tame_an_animal","Ein Tier gezähmt"],["husbandry/whole_pack","Alle Wolfsarten gezähmt"],["husbandry/complete_catalogue","Alle Katzenarten gezähmt"],["husbandry/ride_a_boat_with_a_goat","Mit Ziege Boot gefahren"],["husbandry/bred_all_animals","Alle Tiere gezüchtet"]];
+  box.innerHTML = cards.map(([k, ic, t]) => { const st = STATS.find(s => s.key === k); const top = ps.slice().sort((a, b) => val(b, k) - val(a, k)); const b = top[0];
+    return `<div class="acard"><span class="aic">${ic}</span><span class="small muted">${t}</span>${b && val(b, k) ? `<b><a href="${plink(b.name)}">${esc(b.name)}</a></b><span class="av">${st.fmt(val(b, k))}</span><span class="small muted">${top.slice(1, 3).filter(x => val(x, k)).map(x => `${esc(x.name)} ${st.fmt(val(x, k))}`).join(" · ") || "&nbsp;"}</span>` : `<b class="muted">Noch niemand</b><span class="av">–</span><span>&nbsp;</span>`}</div>`; }).join("");
+  set("animalAdv", tame.map(([id, l]) => { const who = ps.filter(p => advDone(p).some(([x]) => x === id)); return `<div class="arow"><span>${l}</span><span>${who.length ? who.map(p => `<img title="${esc(p.name)}" alt="${esc(p.name)}" src="${head(p.name)}">`).join("") : '<span class="small muted">noch niemand</span>'}</span></div>`; }).join(""));
+}
+
+/* ---------- Easter Egg: Creeper (Code: ↑ ↑ ↓ ↓ ← → ← → B A, oder „creeper“ tippen) ---------- */
+(() => {
+  const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+  let seq = [], typed = "", busy = false;
+  addEventListener("keydown", e => {
+    if (e.target.closest?.("input, textarea")) return;
+    seq = [...seq, e.key.length === 1 ? e.key.toLowerCase() : e.key].slice(-10); typed = (typed + (e.key.length === 1 ? e.key.toLowerCase() : "")).slice(-7);
+    if (seq.join() === KONAMI.join() || typed === "creeper") { seq = []; typed = ""; boom(); }
+  });
+  function boom(){
+    if (busy) return; busy = true;
+    const c = document.createElement("div"); c.className = "egg-creeper"; c.innerHTML = `<img src="https://mc-heads.net/body/MHF_Creeper/160" alt="Creeper">`; document.body.appendChild(c);
+    Sound.on && Sound.play("lose");
+    setTimeout(() => { c.classList.add("hiss"); if (Sound.on && Sound.ctx) Sound.noise(1.4, { vol: .25, freq: 3000, sweep: -2600, q: 2 }); }, 2600);
+    setTimeout(() => {
+      Sound.on && Sound.play("boom");
+      const r = c.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      for (let i = 0; i < 60; i++) { const d = document.createElement("i"); d.className = "mcpart"; const sz = 8 + Math.random() * 12, a = Math.random() * 6.28, sp = 120 + Math.random() * 260;
+        d.style.cssText = `left:${cx}px;top:${cy}px;width:${sz}px;height:${sz}px;background:${rnd(["#5fae35","#3d7a1f","#86603f","#7d7d7d","#222","#f5c542"])};--x:${Math.cos(a) * sp}px;--y:${Math.sin(a) * sp - 80}px;--r:${(Math.random() - .5) * 900}deg;animation-duration:1.1s`;
+        document.body.appendChild(d); setTimeout(() => d.remove(), 1200); }
+      const f = document.createElement("div"); f.className = "egg-flash"; document.body.appendChild(f); setTimeout(() => f.remove(), 700);
+      document.body.classList.add("egg-shake"); setTimeout(() => document.body.classList.remove("egg-shake"), 700);
+      c.remove(); busy = false;
+      const t = document.createElement("div"); t.className = "egg-toast"; t.innerHTML = "<b>Fortschritt erzielt!</b><span>Easter Egg gefunden 💥</span>"; document.body.appendChild(t); setTimeout(() => t.remove(), 4200);
+    }, 4000);
+  }
+})();
 
 /* ---------- Start ---------- */
 buildChrome();

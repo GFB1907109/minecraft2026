@@ -22,7 +22,7 @@ const CONFIG = {
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["wrapped.html", "Wrapped", 1], ["discord.html", "Discord", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["markt.html", "Markt", 1], ["spiele.html", "Spiele", 1], ["casino.html", "Casino", 1], ["wrapped.html", "Wrapped", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
@@ -324,10 +324,10 @@ function periodValue(p, k, per){
   const r = periodRange(per);
   if (!r.from) return { v: val(p, k), partial: false };
   const end = r.to ? valueAt(p, k, r.to) : (p[k] || 0);
-  let start = valueAt(p, k, r.from), partial = false;
-  if (start == null) { start = firstValue(p, k); partial = true; }
-  if (end == null || start == null) return { v: 0, partial: true };
-  return { v: Math.max(0, end - start), partial };
+  const start = valueAt(p, k, r.from);
+  // Für diesen Zeitraum gibt es noch keinen gespeicherten Anfangsstand: Gesamtwert zeigen
+  if (start == null || end == null) return { v: val(p, k), partial: true };
+  return { v: Math.max(0, end - start), partial: false };
 }
 const inRange = (t, per) => { const r = periodRange(per); const d = t.slice(0, 10); return (!r.from || d >= r.from) && (!r.to || d < r.to); };
 function funFacts(T){
@@ -698,6 +698,309 @@ function stars(){
 /* =========================================================
    Seiten
    ========================================================= */
+
+/* ---------- Marktplatz (aus dem Chat: !biete / !suche / !weg) ---------- */
+function marktInto(){
+  const el = $("marktList"); if (!el || !App.stats) return;
+  const MAX = 14 * 864e5, now = Date.now(), offers = [];
+  for (const e of App.events) {
+    if (e[1] !== "c") continue;
+    const m = String(e[3] || "").trim().match(/^!(biete|suche|weg)\b\s*(.*)$/i);
+    if (!m) continue;
+    const kind = m[1].toLowerCase(), t = new Date(e[0]).getTime();
+    if (kind === "weg") { for (const o of offers) if (o.p === e[2]) o.gone = true; continue; }
+    if (m[2]) offers.push({ p: e[2], kind, text: m[2], t });
+  }
+  const filter = $("marktFilter")?.value || "alle";
+  const list = offers.filter(o => !o.gone && now - o.t < MAX && (filter === "alle" || o.kind === filter)).reverse();
+  const when = t => { const h = Math.round((now - t) / 36e5); return h < 1 ? "gerade eben" : h < 24 ? `vor ${h} Std.` : `vor ${Math.round(h / 24)} Tagen`; };
+  el.innerHTML = list.length ? list.map(o => `<div class="markt-card ${o.kind}">
+      <span class="markt-tag">${o.kind === "biete" ? "Biete" : "Suche"}</span>
+      <p class="markt-text">${esc(o.text)}</p>
+      <div class="markt-who"><img src="${head(o.p)}" alt="" width="28" height="28"><b>${esc(o.p)}</b><span class="small muted">${when(o.t)}</span></div>
+    </div>`).join("") : `<p class="muted">Gerade gibt es keine Angebote. Schreib im Spiel zum Beispiel <code>!biete 64 Eisen für 3 Diamanten</code>.</p>`;
+}
+
+/* ---------- Marktplatz: Angebot zusammenklicken ---------- */
+const MARKT_TOP = ["diamond","iron_ingot","gold_ingot","emerald","netherite_ingot","netherite_scrap","ancient_debris","coal","redstone","lapis_lazuli","copper_ingot","quartz","amethyst_shard","diamond_block","iron_block","gold_block","emerald_block","elytra","totem_of_undying","enchanted_golden_apple","golden_apple","golden_carrot","cooked_beef","bread","experience_bottle","enchanted_book","shulker_box","shulker_shell","ender_pearl","blaze_rod","slime_ball","gunpowder","string","leather","bone","arrow","trident","mending","netherite_sword","netherite_pickaxe","diamond_sword","diamond_pickaxe","diamond_axe","diamond_chestplate","beacon","nether_star","oak_log","spruce_log","stone","cobblestone","deepslate","glass","obsidian","sand","dirt","oak_planks","white_wool","sugar_cane","wheat","carrot","potato","saddle","name_tag","trial_key","heavy_core","mace"];
+const MARKT_DE = {diamond:"Diamant",iron_ingot:"Eisenbarren",gold_ingot:"Goldbarren",emerald:"Smaragd",netherite_ingot:"Netheritbarren",netherite_scrap:"Netheritplatten",ancient_debris:"Antiker Schutt",coal:"Kohle",redstone:"Redstone-Staub",lapis_lazuli:"Lapislazuli",copper_ingot:"Kupferbarren",quartz:"Netherquarz",amethyst_shard:"Amethystscherbe",diamond_block:"Diamantblock",iron_block:"Eisenblock",gold_block:"Goldblock",emerald_block:"Smaragdblock",elytra:"Elytren",totem_of_undying:"Totem der Unsterblichkeit",enchanted_golden_apple:"Verzauberter goldener Apfel",golden_apple:"Goldener Apfel",golden_carrot:"Goldene Karotte",cooked_beef:"Steak",bread:"Brot",experience_bottle:"Erfahrungsfläschchen",enchanted_book:"Verzaubertes Buch",shulker_box:"Shulker-Kiste",shulker_shell:"Shulker-Schale",ender_pearl:"Enderperle",blaze_rod:"Lohenrute",slime_ball:"Schleimball",gunpowder:"Schwarzpulver",string:"Faden",leather:"Leder",bone:"Knochen",arrow:"Pfeil",trident:"Dreizack",mending:"Reparatur-Buch",netherite_sword:"Netheritschwert",netherite_pickaxe:"Netheritspitzhacke",diamond_sword:"Diamantschwert",diamond_pickaxe:"Diamantspitzhacke",diamond_axe:"Diamantaxt",diamond_chestplate:"Diamantharnisch",beacon:"Leuchtfeuer",nether_star:"Netherstern",oak_log:"Eichenstamm",spruce_log:"Fichtenstamm",stone:"Stein",cobblestone:"Bruchstein",deepslate:"Tiefenschiefer",glass:"Glas",obsidian:"Obsidian",sand:"Sand",dirt:"Erde",oak_planks:"Eichenholzbretter",white_wool:"Weiße Wolle",sugar_cane:"Zuckerrohr",wheat:"Weizen",carrot:"Karotte",potato:"Kartoffel",saddle:"Sattel",name_tag:"Namensschild",trial_key:"Prüfungsschlüssel",heavy_core:"Schwerer Kern",mace:"Streitkolben",creeper_head:"Creeper-Kopf",tnt:"TNT"};
+const deItem = id => App.stats?.advNames?._item?.[id] || MARKT_DE[id] || itemName(id);
+function marktItems(){
+  const all = Object.keys(App.stats?.advNames?._item || {}).filter(id => !/^(air|cave_air|void_air|.*_wall_.*|potted_.*|.*_stem|moving_piston|piston_head|end_gateway|end_portal|nether_portal|fire|soul_fire|water|lava|bubble_column)$/.test(id));
+  return [...new Set([...MARKT_TOP.filter(i => i !== "mending"), ...all])];
+}
+function marktBuilder(){
+  const st = { kind: "biete", give: null, giveN: 1, want: null, wantN: 1, slot: "give" };
+  const grid = $("mbGrid"), search = $("mbSearch"), out = $("mbOut");
+  const btn = id => `<button type="button" class="mb-item" data-id="${id}" title="${esc(deItem(id))}"><img loading="lazy" alt="" src="${itemImg(id)}" onerror="this.style.visibility='hidden'"><span>${esc(deItem(id))}</span></button>`;
+  const drawGrid = () => {
+    const q = search.value.trim().toLowerCase();
+    const list = marktItems().filter(id => !q || deItem(id).toLowerCase().includes(q) || id.includes(q.replace(/ /g, "_")));
+    grid.innerHTML = list.slice(0, q ? 120 : 66).map(btn).join("") || `<p class="muted">Nichts gefunden.</p>`;
+  };
+  const pick = (which) => { const id = st[which]; return id ? `<img src="${itemImg(id)}" alt=""><b>${esc(deItem(id))}</b>` : `<span class="muted">Item wählen</span>`; };
+  const draw = () => {
+    document.querySelectorAll(".mb-kind button").forEach(b => b.classList.toggle("on", b.dataset.k === st.kind));
+    $("mbGiveLbl").textContent = st.kind === "biete" ? "Ich gebe" : "Ich suche";
+    $("mbWantLbl").textContent = st.kind === "biete" ? "Ich will dafür" : "Ich zahle";
+    $("mbGive").innerHTML = pick("give"); $("mbWant").innerHTML = pick("want");
+    $("mbGive").classList.toggle("on", st.slot === "give"); $("mbWant").classList.toggle("on", st.slot === "want");
+    $("mbGiveN").value = st.giveN; $("mbWantN").value = st.wantN;
+    const a = st.give ? `${st.giveN} ${deItem(st.give)}` : "";
+    const b = st.want ? `${st.wantN} ${deItem(st.want)}` : "";
+    const cmd = a ? `!${st.kind} ${a}${b ? (st.kind === "biete" ? " für " : ", zahle ") + b : ""}` : "";
+    out.textContent = cmd || "Wähle zuerst ein Item aus.";
+    $("mbCopy").disabled = !cmd;
+  };
+  document.querySelectorAll(".mb-kind button").forEach(b => b.onclick = () => { st.kind = b.dataset.k; draw(); });
+  $("mbGive").onclick = () => { st.slot = "give"; draw(); search.focus(); };
+  $("mbWant").onclick = () => { st.slot = "want"; draw(); search.focus(); };
+  grid.onclick = e => { const b = e.target.closest(".mb-item"); if (!b) return; st[st.slot] = b.dataset.id; if (st.slot === "give") st.slot = "want"; draw(); };
+  $("mbGiveN").oninput = e => { st.giveN = Math.max(1, Math.min(9999, +e.target.value || 1)); draw(); };
+  $("mbWantN").oninput = e => { st.wantN = Math.max(1, Math.min(9999, +e.target.value || 1)); draw(); };
+  document.querySelectorAll(".mb-n button").forEach(b => b.onclick = () => { const k = b.dataset.f; st[k] = b.dataset.v === "64" ? 64 : Math.max(1, st[k] + +b.dataset.v); draw(); });
+  $("mbCopy").onclick = async () => { try { await navigator.clipboard.writeText(out.textContent); $("mbCopy").textContent = "Kopiert ✓"; setTimeout(() => $("mbCopy").textContent = "Befehl kopieren", 2000); } catch {} };
+  search.oninput = drawGrid;
+  drawGrid(); draw();
+  onUpdate(() => { drawGrid(); draw(); });
+}
+
+/* ---------- Spiele ---------- */
+const rnd = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => a.map(x => [Math.random(), x]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+const gameStats = () => STATS.filter(s => players().filter(p => val(p, s.key) > 0).length >= 2);
+const best = k => { try { return +localStorage.getItem("mc26_" + k) || 0; } catch { return 0; } };
+const saveBest = (k, v) => { try { if (v > best(k)) localStorage.setItem("mc26_" + k, v); } catch {} };
+const confetti = () => { for (let i = 0; i < 40; i++) { const c = document.createElement("i"); c.className = "conf"; c.style.left = Math.random() * 100 + "vw"; c.style.background = rnd(["#7bd34f","#f5c542","#5ad1f0","#e2557b","#fff"]); c.style.animationDelay = Math.random() * .4 + "s"; document.body.appendChild(c); setTimeout(() => c.remove(), 2200); } };
+
+function gameHL(){ // Höher oder tiefer
+  const el = $("gHL"); let streak = 0, cur = null;
+  const next = () => {
+    const st = rnd(gameStats()); if (!st) { el.innerHTML = `<p class="muted">Noch zu wenig Daten.</p>`; return; }
+    const ps = shuffle(players().filter(p => val(p, st.key) !== undefined)).slice(0, 2);
+    if (ps.length < 2) return;
+    cur = { st, a: ps[0], b: ps[1] };
+    el.innerHTML = `<p class="g-q">Wer hat mehr <b>${esc(st.label)}</b>?</p>
+      <div class="g-duo">${ps.map((p, i) => `<button type="button" class="g-pl" data-i="${i}"><img src="${body(p.name)}" alt=""><b>${esc(p.name)}</b><span class="g-val" hidden>${st.fmt(val(p, st.key))}</span></button>`).join(`<span class="g-vs">VS</span>`)}</div>
+      <p class="g-score">Serie: <b>${streak}</b> · Rekord: <b>${best("hl")}</b></p>`;
+    el.querySelectorAll(".g-pl").forEach(b => b.onclick = () => answer(+b.dataset.i));
+  };
+  const answer = i => {
+    const { st, a, b } = cur, va = val(a, st.key), vb = val(b, st.key);
+    const ok = va === vb || (i === 0 ? va > vb : vb > va);
+    el.querySelectorAll(".g-pl").forEach((x, j) => { x.disabled = true; x.querySelector(".g-val").hidden = false; x.classList.add((j === 0 ? va >= vb : vb >= va) ? "win" : "lose"); });
+    if (ok) { streak++; saveBest("hl", streak); if (streak % 5 === 0) confetti(); setTimeout(next, 1300); }
+    else { el.insertAdjacentHTML("beforeend", `<p class="g-msg bad">Falsch! Deine Serie: ${streak}</p><button type="button" class="g-btn" id="hlAgain">Nochmal</button>`); streak = 0; $("hlAgain").onclick = next; }
+  };
+  next();
+}
+
+function gameWho(){ // Wer bin ich + Skin-Rätsel
+  const el = $("gWho"); let pts = 0, round = 0;
+  const next = () => {
+    const ps = players(); if (ps.length < 3) { el.innerHTML = `<p class="muted">Noch zu wenig Spieler.</p>`; return; }
+    const p = rnd(ps), mode = Math.random() < .5 ? "stats" : "skin";
+    const clues = shuffle(gameStats().filter(s => val(p, s.key) > 0)).slice(0, 3);
+    const opts = shuffle([p, ...shuffle(ps.filter(x => x !== p)).slice(0, 3)]);
+    el.innerHTML = (mode === "skin"
+      ? `<p class="g-q">Wessen Skin ist das?</p><div class="g-pix"><img src="${head(p.name)}" alt="" id="whoImg"></div>`
+      : `<p class="g-q">Wer bin ich?</p><ul class="g-clues">${clues.map(s => `<li>${esc(s.label)}: <b>${s.fmt(val(p, s.key))}</b></li>`).join("")}</ul>`)
+      + `<div class="g-opts">${opts.map(o => `<button type="button" class="g-btn ghost" data-n="${esc(o.name)}">${esc(o.name)}</button>`).join("")}</div>
+      <p class="g-score">Runde ${round + 1}/10 · Punkte: <b>${pts}</b> · Rekord: <b>${best("who")}</b>/10</p>`;
+    el.querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
+      const ok = b.dataset.n === p.name; if (ok) pts++;
+      el.querySelectorAll("[data-n]").forEach(x => { x.disabled = true; if (x.dataset.n === p.name) x.classList.add("win"); else if (x === b) x.classList.add("lose"); });
+      const img = $("whoImg"); if (img) img.classList.add("clear");
+      round++;
+      setTimeout(() => round < 10 ? next() : end(), 1400);
+    });
+  };
+  const end = () => { saveBest("who", pts); if (pts >= 8) confetti();
+    el.innerHTML = `<p class="g-big">${pts}/10</p><p class="g-q">${pts >= 9 ? "Du kennst den Server auswendig!" : pts >= 6 ? "Nicht schlecht!" : "Da musst du mehr online sein …"}</p><button type="button" class="g-btn" id="whoAgain">Nochmal spielen</button>`;
+    $("whoAgain").onclick = () => { pts = 0; round = 0; next(); }; };
+  next();
+}
+
+function gameWheel(canvasId, btnId, outId, itemsFn, colors){
+  const cv = $(canvasId), ctx = cv.getContext("2d"); let ang = 0, spinning = false;
+  const draw = () => {
+    const it = itemsFn(), n = it.length, r = cv.width / 2; ctx.clearRect(0, 0, cv.width, cv.width);
+    it.forEach((t, i) => {
+      const a0 = ang + i * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n;
+      ctx.beginPath(); ctx.moveTo(r, r); ctx.arc(r, r, r - 4, a0, a1); ctx.fillStyle = colors[i % colors.length]; ctx.fill();
+      ctx.save(); ctx.translate(r, r); ctx.rotate((a0 + a1) / 2); ctx.fillStyle = "#14101c"; ctx.font = "600 15px Outfit, sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(t.length > 22 ? t.slice(0, 21) + "…" : t, r - 16, 5); ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(r, r, 18, 0, 7); ctx.fillStyle = "#1c1426"; ctx.fill();
+  };
+  $(btnId).onclick = () => {
+    if (spinning) return; spinning = true; $(outId).textContent = "…";
+    const it = itemsFn(), start = ang, target = ang + 8 * Math.PI + Math.random() * 2 * Math.PI, t0 = performance.now(), dur = 3800;
+    const step = now => { const k = Math.min(1, (now - t0) / dur); ang = start + (target - start) * (1 - Math.pow(1 - k, 4)); draw();
+      if (k < 1) return requestAnimationFrame(step);
+      spinning = false; const n = it.length, a = ((-Math.PI / 2 - ang) % (2 * Math.PI) + 4 * Math.PI) % (2 * Math.PI);
+      $(outId).textContent = it[Math.floor(a / (2 * Math.PI / n))]; confetti(); };
+    requestAnimationFrame(step);
+  };
+  draw();
+  return draw;
+}
+const CHALLENGES = ["Ohne Rüstung in den Nether","Baue ein Haus in 20 Minuten","Nur Holzwerkzeug für 1 Stunde","Finde 5 Diamanten","Töte 10 Creeper","Zähme ein Tier","Baue eine Brücke über einen Fluss","Lauf 2 km ohne Sprint","Hol einen Netherstern","Fang 10 Fische","Kein Essen bis zum Abend","Bau einen Farm-Automaten","Besuche alle Basen","Überlebe eine Nacht draußen ohne Bett","Mach jemandem ein Geschenk","Erkunde eine Ruine oder einen Tempel","Nur mit Pfeil und Bogen kämpfen","Sammle 1 Stack von jedem Holz"];
+const JOBS = ["Holz farmen","Essen besorgen","Mob-Farm bauen","Diamanten suchen","Lager aufräumen","Nether-Portal bauen","Tiere züchten","Straße bauen"];
+function spieleInit(){
+  if (!App.stats) return;
+  if (!spieleInit.done) { spieleInit.done = 1; gameHL(); gameWho();
+    gameWheel("wheelC", "wheelCBtn", "wheelCOut", () => CHALLENGES.slice(0, 12), ["#7bd34f","#5ad1f0","#f5c542","#e2557b","#b38cf5","#ffa14a"]);
+    gameWheel("wheelP", "wheelPBtn", "wheelPOut", () => players().map(p => p.name), ["#f5c542","#7bd34f","#e2557b","#5ad1f0","#b38cf5","#ffa14a"]);
+    $("jobOut").textContent = rnd(JOBS); $("jobNew").onclick = () => $("jobOut").textContent = rnd(JOBS);
+  }
+}
+
+/* ---------- Casino (nur Spielgeld, im Browser gespeichert) ---------- */
+const Bank = {
+  get(){ try { const v = localStorage.getItem("mc26_dia"); return v == null ? 100 : +v; } catch { return this._v ?? 100; } },
+  set(v){ this._v = Math.max(0, Math.round(v)); try { localStorage.setItem("mc26_dia", this._v); } catch {} Bank.draw(); },
+  draw(){ const v = Bank.get(); document.querySelectorAll(".bank-v").forEach(e => e.textContent = nf.format(v)); const r = $("bankRefill"); if (r) r.hidden = v > 0; }
+};
+const betOf = id => { const v = Math.floor(+$(id).value || 0); if (v < 1) { $(id).value = 1; return 1; } return v; };
+function casinoMsg(id, txt, good){ const e = $(id); e.textContent = txt; e.className = "cs-msg " + (good ? "good" : good === false ? "bad" : ""); }
+function payable(bet, msgId){ if (bet > Bank.get()) { casinoMsg(msgId, "Nicht genug Diamanten!", false); return false; } return true; }
+
+const SLOT = [["dirt",1,30],["coal",2,24],["iron_ingot",3,18],["gold_ingot",5,12],["emerald",10,8],["diamond",25,5],["netherite_ingot",50,2],["creeper_head",0,6]];
+function slotsInit(){
+  const reels = [...document.querySelectorAll(".reel")], tot = SLOT.reduce((a, s) => a + s[2], 0);
+  const roll = () => { let r = Math.random() * tot; for (const s of SLOT) if ((r -= s[2]) < 0) return s; return SLOT[0]; };
+  const img = s => `<img src="${itemImg(s[0])}" alt="${esc(deItem(s[0]))}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fb',textContent:this.alt}))">`;
+  reels.forEach(r => r.innerHTML = img(SLOT[5]));
+  $("pt").innerHTML = SLOT.filter(s => s[1]).map(s => `<span>${img(s)}×3 = <b>${s[1]}×</b></span>`).join("") + `<span>2 gleiche = <b>Einsatz zurück</b></span><span>${img(SLOT[7])} = <b>Boom, verloren</b></span>`;
+  let busy = false;
+  $("slotGo").onclick = () => {
+    if (busy) return; const bet = betOf("slotBet"); if (!payable(bet, "slotMsg")) return;
+    busy = true; Bank.set(Bank.get() - bet); casinoMsg("slotMsg", "…");
+    const res = [roll(), roll(), roll()];
+    reels.forEach((r, i) => { r.classList.add("spin"); const t = setInterval(() => r.innerHTML = img(rnd(SLOT)), 80);
+      setTimeout(() => { clearInterval(t); r.classList.remove("spin"); r.innerHTML = img(res[i]);
+        if (i === 2) { busy = false;
+          const ids = res.map(x => x[0]);
+          if (ids.includes("creeper_head")) casinoMsg("slotMsg", "💥 Creeper! Alles weg.", false);
+          else if (ids[0] === ids[1] && ids[1] === ids[2]) { const w = bet * res[0][1]; Bank.set(Bank.get() + w); casinoMsg("slotMsg", `JACKPOT! +${nf.format(w)} 💎`, true); confetti(); }
+          else if (new Set(ids).size === 2) { Bank.set(Bank.get() + bet); casinoMsg("slotMsg", "Zwei gleiche: Einsatz zurück.", null); }
+          else casinoMsg("slotMsg", "Leider nichts.", false);
+        } }, 700 + i * 450); });
+  };
+}
+
+function coinInit(){
+  let pick = "steve";
+  document.querySelectorAll("[data-side]").forEach(b => b.onclick = () => { pick = b.dataset.side; document.querySelectorAll("[data-side]").forEach(x => x.classList.toggle("on", x === b)); });
+  $("coinGo").onclick = () => {
+    const bet = betOf("coinBet"); if (!payable(bet, "coinMsg")) return;
+    const coin = $("coin"); if (coin.classList.contains("flip")) return;
+    Bank.set(Bank.get() - bet); const res = Math.random() < .5 ? "steve" : "creeper";
+    coin.className = "coin flip " + res; casinoMsg("coinMsg", "…");
+    setTimeout(() => { coin.className = "coin " + res;
+      if (res === pick) { Bank.set(Bank.get() + bet * 2); casinoMsg("coinMsg", `Gewonnen! +${nf.format(bet * 2)} 💎`, true); }
+      else casinoMsg("coinMsg", "Verloren!", false); }, 1600);
+  };
+}
+
+function minesInit(){
+  const grid = $("mGrid"); let st = null;
+  const mult = safe => { const n = 25, b = st.bombs; let m = 1; for (let i = 0; i < safe; i++) m *= (n - i) / (n - b - i); return m * .97; };
+  const draw = () => {
+    grid.innerHTML = Array.from({ length: 25 }, (_, i) => { const o = st?.open.has(i), bomb = st?.bombSet.has(i), show = o || (st?.over && bomb);
+      return `<button type="button" class="mc ${show ? (bomb ? "boom" : "ok") : ""}" data-i="${i}" ${!st || st.over || o ? "disabled" : ""}>${show ? (bomb ? `<img src="${itemImg("tnt")}" alt="TNT">` : `<img src="${itemImg("diamond")}" alt="Diamant">`) : ""}</button>`; }).join("");
+    const safe = st ? st.open.size : 0;
+    $("mCash").disabled = !st || st.over || !safe;
+    $("mInfo").textContent = st && !st.over ? `Gefunden: ${safe} · Auszahlen: ${nf.format(Math.floor(st.bet * mult(safe)))} 💎 · Nächstes Feld: ${nf1.format(mult(safe + 1))}×` : "";
+  };
+  $("mGo").onclick = () => {
+    const bet = betOf("mBet"); if (!payable(bet, "mMsg")) return;
+    const bombs = +$("mBombs").value; Bank.set(Bank.get() - bet);
+    const bombSet = new Set(shuffle([...Array(25).keys()]).slice(0, bombs));
+    st = { bet, bombs, bombSet, open: new Set(), over: false }; casinoMsg("mMsg", "Klick auf ein Feld. Vorsicht vor TNT!"); draw();
+  };
+  grid.onclick = e => { const b = e.target.closest(".mc"); if (!b || !st || st.over) return; const i = +b.dataset.i;
+    if (st.bombSet.has(i)) { st.over = true; st.open.add(i); casinoMsg("mMsg", "💥 TNT! Einsatz verloren.", false); }
+    else { st.open.add(i); if (st.open.size === 25 - st.bombs) { const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Alles gefunden! +${nf.format(w)} 💎`, true); confetti(); } }
+    draw(); };
+  $("mCash").onclick = () => { if (!st || st.over) return; const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Ausgezahlt: +${nf.format(w)} 💎`, true); draw(); };
+  draw();
+}
+
+/* Roulette: Redstone = rot, Kohle = schwarz, Smaragd = 0 */
+const RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const WHEEL = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const rCol = n => n === 0 ? "green" : RED.has(n) ? "red" : "black";
+function rouletteInit(){
+  const cv = $("rWheel"), ctx = cv.getContext("2d"), R = cv.width / 2; let ang = 0, busy = false, choice = "red";
+  const draw = () => { ctx.clearRect(0, 0, cv.width, cv.width); const n = WHEEL.length;
+    WHEEL.forEach((num, i) => { const a0 = ang + i * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n;
+      ctx.beginPath(); ctx.moveTo(R, R); ctx.arc(R, R, R - 6, a0, a1); ctx.fillStyle = { green: "#2fa84f", red: "#b3261e", black: "#26222c" }[rCol(num)]; ctx.fill();
+      ctx.strokeStyle = "#c99a1d"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.save(); ctx.translate(R, R); ctx.rotate((a0 + a1) / 2); ctx.fillStyle = "#fff"; ctx.font = "700 20px Outfit, sans-serif"; ctx.textAlign = "right"; ctx.fillText(num, R - 18, 7); ctx.restore(); });
+    ctx.beginPath(); ctx.arc(R, R, R * .42, 0, 7); ctx.fillStyle = "#5c4630"; ctx.fill(); ctx.beginPath(); ctx.arc(R, R, R * .3, 0, 7); ctx.fillStyle = "#1c1426"; ctx.fill(); };
+  draw();
+  document.querySelectorAll("[data-r]").forEach(b => b.onclick = () => { choice = b.dataset.r; document.querySelectorAll("[data-r]").forEach(x => x.classList.toggle("on", x === b)); $("rNum").value = ""; });
+  $("rNum").oninput = () => { if ($("rNum").value !== "") { choice = "num"; document.querySelectorAll("[data-r]").forEach(x => x.classList.remove("on")); } };
+  $("rGo").onclick = () => {
+    if (busy) return; const bet = betOf("rBet"); if (!payable(bet, "rMsg")) return;
+    let num = null; if (choice === "num") { num = Math.floor(+$("rNum").value); if (!(num >= 0 && num <= 36)) { casinoMsg("rMsg", "Zahl zwischen 0 und 36 eingeben.", false); return; } }
+    busy = true; Bank.set(Bank.get() - bet); casinoMsg("rMsg", "Die Kugel rollt …");
+    const idx = Math.floor(Math.random() * 37), res = WHEEL[idx], seg = 2 * Math.PI / 37;
+    const want = -Math.PI / 2 - (idx + .5) * seg, start = ang, target = start + 10 * Math.PI + (((want - start) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), t0 = performance.now();
+    const step = now => { const k = Math.min(1, (now - t0) / 4500); ang = start + (target - start) * (1 - Math.pow(1 - k, 4)); draw();
+      if (k < 1) return requestAnimationFrame(step); busy = false;
+      const c = rCol(res), name = { green: "Smaragd", red: "Redstone", black: "Kohle" }[c];
+      const odd = res % 2 === 1;
+      const win = choice === "num" ? (num === res ? 36 : 0)
+        : choice === "green" ? (res === 0 ? 36 : 0)
+        : choice === "red" || choice === "black" ? (c === choice ? 2 : 0)
+        : choice === "odd" ? (res && odd ? 2 : 0) : choice === "even" ? (res && !odd ? 2 : 0)
+        : choice === "low" ? (res >= 1 && res <= 18 ? 2 : 0) : choice === "high" ? (res >= 19 ? 2 : 0) : 0;
+      $("rLast").insertAdjacentHTML("afterbegin", `<span class="rl ${c}">${res}</span>`); while ($("rLast").children.length > 12) $("rLast").lastChild.remove();
+      if (win) { Bank.set(Bank.get() + bet * win); casinoMsg("rMsg", `${res} ${name}! Gewonnen: +${nf.format(bet * win)} 💎`, true); if (win > 2) confetti(); }
+      else casinoMsg("rMsg", `${res} ${name}. Verloren.`, false); };
+    requestAnimationFrame(step);
+  };
+}
+
+/* Blackjack „Creeper 21“: Farben = Diamant, Smaragd, Redstone, Kohle */
+const SUITS = [["diamond","Diamant"],["emerald","Smaragd"],["redstone","Redstone"],["coal","Kohle"]];
+const RANKS = [["A",11],["2",2],["3",3],["4",4],["5",5],["6",6],["7",7],["8",8],["9",9],["10",10],["B",10],["D",10],["K",10]];
+function bjInit(){
+  let deck = [], me = [], dl = [], bet = 0, live = false;
+  const newDeck = () => { deck = shuffle(SUITS.flatMap(s => RANKS.map(r => ({ s, r })))); };
+  const draw1 = () => { if (deck.length < 12) newDeck(); return deck.pop(); };
+  const score = h => { let t = h.reduce((a, c) => a + c.r[1], 0), aces = h.filter(c => c.r[0] === "A").length; while (t > 21 && aces--) t -= 10; return t; };
+  const card = (c, hide) => hide ? `<div class="card back"></div>` : `<div class="card ${c.s[0]}"><b>${c.r[0]}</b><img src="${itemImg(c.s[0])}" alt="${c.s[1]}"><b class="rot">${c.r[0]}</b></div>`;
+  const show = (hideDealer) => {
+    $("bjDealer").innerHTML = dl.map((c, i) => card(c, hideDealer && i === 1)).join("");
+    $("bjMe").innerHTML = me.map(c => card(c)).join("");
+    $("bjDs").textContent = hideDealer ? "?" : score(dl); $("bjMs").textContent = me.length ? score(me) : "";
+    $("bjHit").disabled = $("bjStand").disabled = $("bjDouble").disabled = !live;
+    if (live && (me.length > 2 || Bank.get() < bet)) $("bjDouble").disabled = true;
+    $("bjGo").disabled = live;
+  };
+  const end = (txt, mult) => { live = false; if (mult) Bank.set(Bank.get() + Math.floor(bet * mult)); casinoMsg("bjMsg", txt + (mult ? ` +${nf.format(Math.floor(bet * mult))} 💎` : ""), mult > 1 ? true : mult === 1 ? null : false); if (mult >= 2.5) confetti(); show(false); };
+  const dealerPlay = () => { while (score(dl) < 17) dl.push(draw1()); const d = score(dl), m = score(me);
+    if (d > 21) end("Der Händler hat sich übernommen!", 2); else if (m > d) end("Du gewinnst!", 2); else if (m === d) end("Unentschieden.", 1); else end(`Händler hat ${d}. Verloren.`, 0); };
+  $("bjGo").onclick = () => { bet = betOf("bjBet"); if (!payable(bet, "bjMsg")) return; Bank.set(Bank.get() - bet);
+    me = [draw1(), draw1()]; dl = [draw1(), draw1()]; live = true; casinoMsg("bjMsg", "Karte ziehen oder stehen bleiben?"); show(true);
+    if (score(me) === 21) { score(dl) === 21 ? end("Beide 21. Unentschieden.", 1) : end("CREEPER 21! Natürlicher Blackjack!", 2.5); } };
+  $("bjHit").onclick = () => { me.push(draw1()); const m = score(me); show(true); if (m > 21) end(`💥 ${m}, explodiert! Verloren.`, 0); else if (m === 21) dealerPlay(); };
+  $("bjStand").onclick = () => dealerPlay();
+  $("bjDouble").onclick = () => { if (Bank.get() < bet) return; Bank.set(Bank.get() - bet); bet *= 2; me.push(draw1()); const m = score(me); if (m > 21) end(`💥 ${m}, explodiert! Verloren.`, 0); else dealerPlay(); };
+  newDeck(); show(false);
+}
+
+function casinoInit(){
+  slotsInit(); rouletteInit(); bjInit(); coinInit(); minesInit(); Bank.draw();
+  $("bankRefill").onclick = () => { Bank.set(100); };
+  document.querySelectorAll("[data-bet]").forEach(b => b.onclick = () => { const inp = $(b.dataset.for), v = b.dataset.bet;
+    inp.value = v === "max" ? Math.max(1, Bank.get()) : v === "half" ? Math.max(1, Math.floor(+inp.value / 2)) : Math.max(1, (+inp.value || 0) * 2); });
+}
+
 const PAGE_INIT = {
 
   start(){
@@ -857,19 +1160,20 @@ const PAGE_INIT = {
       const p = players().find(x => x.uuid === who); if (!p) return [];
       const r = periodRange(per), V = k => periodValue(p, k, per);
       const play = V("play"), partial = play.partial && per !== "all";
+      const inP = t => partial || inRange(t, per);
       const rank = k => [...players()].sort((a, b) => periodValue(b, k, per).v - periodValue(a, k, per).v).indexOf(p) + 1;
-      const ss = sessions().filter(x => x.p === p.name && inRange(x.from, per)).map(x => ({ ...x, ms: sessionEnd(x) - toDate(x.from) }));
+      const ss = sessions().filter(x => x.p === p.name && inP(x.from)).map(x => ({ ...x, ms: sessionEnd(x) - toDate(x.from) }));
       const longest = ss.sort((a, b) => b.ms - a.ms)[0];
       const hours = new Array(24).fill(0); ss.forEach(x => hours[+x.from.slice(11, 13)]++);
       const favH = ss.length ? hours.indexOf(Math.max(...hours)) : null;
-      const chats = App.events.filter(e => e[1] === "c" && e[2] === p.name && inRange(e[0], per)).length;
-      const ds = deaths().filter(d => d.p === p.name && inRange(d.t, per));
-      const adv = advDone(p).filter(([, t]) => t && inRange(t, per));
+      const chats = App.events.filter(e => e[1] === "c" && e[2] === p.name && inP(e[0])).length;
+      const ds = deaths().filter(d => d.p === p.name && inP(d.t));
+      const adv = advDone(p).filter(([, t]) => t && inP(t));
       const nem = p.killedBy?.[0];
       const ff = funFacts({ dist: V("dist").v, play: play.v, jumps: V("jumps").v, mined: V("mined").v, mobs: V("mobs").v, deaths: V("deaths").v, fish: V("fish").v });
       const big = (n, unit) => `<div class="w-big">${n}<span>${unit || ""}</span></div>`;
       const out = [];
-      out.push(`<span class="w-eyebrow">Minecraft 2026 · Wrapped</span><h2 class="w-title">${esc(p.name)}<br>${per === "all" ? "insgesamt" : "im " + esc(r.label)}</h2><img class="w-skin" alt="" src="${body(p.name)}"><p>${partial ? "Seit Beginn der Aufzeichnung" : "Dein Rückblick"} – klick dich durch.</p>`);
+      out.push(`<span class="w-eyebrow">Minecraft 2026 · Wrapped</span><h2 class="w-title">${esc(p.name)}<br>${per === "all" ? "insgesamt" : "im " + esc(r.label)}</h2><img class="w-skin" alt="" src="${body(p.name)}"><p>${partial ? "Für diesen Monat gibt es noch keine Daten, deshalb siehst du deine <b>Gesamt-Werte</b>." : "Dein Rückblick"} Klick dich durch.</p>`);
       out.push(`<span class="w-eyebrow">Spielzeit</span>${big(nf1.format(play.v / 72000), " Stunden")}<p>Damit bist du <b>Platz ${rank("play")}</b> von ${players().length} auf dem Server.</p>${play.v > 0 ? `<p class="w-small">Das sind ${N(play.v / 72000 * 60 / 90)} Fußballspiele hintereinander.</p>` : ""}`);
       if (longest) out.push(`<span class="w-eyebrow">Am Stück</span>${big(dur(longest.ms))}<p>Deine längste Session, am ${dayLabel(longest.from.slice(0, 10))} ab ${longest.from.slice(11, 16)} Uhr.</p>${favH != null ? `<p class="w-small">Am liebsten spielst du gegen <b>${String(favH).padStart(2, "0")}:00 Uhr</b>.</p>` : ""}`);
       out.push(`<span class="w-eyebrow">Bergbau</span>${big(N(V("mined").v), " Blöcke")}<p><b>${N(V("diamond").v)}</b> Diamanterz und <b>${N(V("debris").v)}</b> Antiker Schutt.</p><p class="w-small">Platz ${rank("mined")} beim Abbauen.</p>`);
@@ -904,6 +1208,9 @@ const PAGE_INIT = {
     onUpdate(draw);
   },
 
+  casino(){ casinoInit(); },
+  spiele(){ onUpdate(spieleInit); },
+  markt(){ marktBuilder(); $("marktFilter").addEventListener("change", marktInto); onUpdate(marktInto); },
   bingo(){ $("bingoPlayer").addEventListener("change", bingoInto); onUpdate(bingoInto); },
 
   events(){

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Casino · Minecraft 2026</title>
+<meta name="description" content="Wochen-Bingo auf Minecraft 2026.">
+<meta name="theme-color" content="#1c1426">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="casino">
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<header class="top" id="top"></header>
+<main id="inhalt">
+<section class="page-head"><div class="wrap"><span class="eyebrow">Casino</span><h1>Das Diamanten-Casino</h1><p class="lead">Nur zum Spaß: Hier wird mit Spiel-Diamanten gezockt, nicht mit echten Items oder echtem Geld. Jeder startet mit 100.</p></div></section>
+<section class="block-sec"><div class="wrap">
+<div class="bank"><span class="bank-big"><img src="https://minecraft.wiki/w/Special:FilePath/Invicon_Diamond.png" alt=""><span class="bank-v">100</span> Diamanten</span><button type="button" class="g-btn" id="bankRefill" hidden>Neu aufladen (100)</button></div>
+<div class="casino">
+  <div class="panel game"><h2>Redstone-Roulette</h2><p class="small muted">Redstone ist Rot, Kohle ist Schwarz, Smaragd ist die 0. Eine Farbe zahlt das Doppelte, eine genaue Zahl das 36-fache.</p>
+    <div class="r-wrap"><canvas id="rWheel" width="600" height="600"></canvas></div>
+    <div class="r-bets"><button type="button" class="g-btn r-red on" data-r="red">Redstone</button><button type="button" class="g-btn r-black" data-r="black">Kohle</button><button type="button" class="g-btn r-green" data-r="green">Smaragd 0</button><button type="button" class="g-btn ghost" data-r="odd">Ungerade</button><button type="button" class="g-btn ghost" data-r="even">Gerade</button><button type="button" class="g-btn ghost" data-r="low">1–18</button><button type="button" class="g-btn ghost" data-r="high">19–36</button><input type="number" min="0" max="36" id="rNum" placeholder="Zahl" aria-label="Genaue Zahl"></div>
+    <div class="cs-bet"><label class="small muted" for="rBet">Einsatz</label><input type="number" min="1" id="rBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="rBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="rBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="rBet">Alles</button><button type="button" class="g-btn" id="rGo">Kugel werfen!</button></div>
+    <p class="cs-msg" id="rMsg"></p><div class="r-last" id="rLast"></div></div>
+  <div class="panel game"><h2>Creeper 21</h2><p class="small muted">Blackjack mit Minecraft-Karten. Komm so nah wie möglich an 21. Bei über 21 explodierst du. Der Händler zieht bis 17.</p>
+    <div class="bj-row"><b class="sc" id="bjDs"></b><span class="small muted">Händler (Villager)</span></div><div class="hand" id="bjDealer"></div>
+    <div class="bj-row"><b class="sc" id="bjMs"></b><span class="small muted">Du</span></div><div class="hand" id="bjMe"></div>
+    <div class="cs-bet"><label class="small muted" for="bjBet">Einsatz</label><input type="number" min="1" id="bjBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="bjBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="bjBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="bjBet">Alles</button><button type="button" class="g-btn" id="bjGo">Austeilen</button></div>
+    <div class="bj-btns"><button type="button" class="g-btn ghost" id="bjHit">Karte ziehen</button><button type="button" class="g-btn ghost" id="bjStand">Stehen bleiben</button><button type="button" class="g-btn ghost" id="bjDouble">Verdoppeln</button></div>
+    <p class="cs-msg" id="bjMsg"></p></div>
+  <div class="panel game"><h2>Slot-Maschine</h2><p class="small muted">3 gleiche gewinnen. Kommt ein Creeper, explodiert dein Einsatz.</p>
+    <div class="reels"><div class="reel"></div><div class="reel"></div><div class="reel"></div></div>
+    <div class="cs-bet"><label class="small muted" for="slotBet">Einsatz</label><input type="number" min="1" id="slotBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="slotBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="slotBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="slotBet">Alles</button><button type="button" class="g-btn" id="slotGo">Drehen!</button></div>
+    <p class="cs-msg" id="slotMsg"></p><div class="pt" id="pt"></div></div>
+  <div class="panel game"><h2>Steve oder Creeper</h2><p class="small muted">Münzwurf: Liegst du richtig, verdoppelt sich dein Einsatz.</p>
+    <div class="coin-wrap"><div class="coin steve" id="coin"></div></div>
+    <div class="sides"><button type="button" class="g-btn ghost on" data-side="steve">Steve</button><button type="button" class="g-btn ghost" data-side="creeper">Creeper</button></div>
+    <div class="cs-bet"><label class="small muted" for="coinBet">Einsatz</label><input type="number" min="1" id="coinBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="coinBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="coinBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="coinBet">Alles</button><button type="button" class="g-btn" id="coinGo">Werfen!</button></div>
+    <p class="cs-msg" id="coinMsg"></p></div>
+  <div class="panel game"><h2>TNT-Minen</h2><p class="small muted">Deck Diamanten auf, ohne TNT zu erwischen. Je mehr du findest, desto mehr gewinnst du. Hör rechtzeitig auf und zahl aus!</p>
+    <div class="cs-bet"><label class="small muted" for="mBet">Einsatz</label><input type="number" min="1" id="mBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="mBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="mBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="mBet">Alles</button><label class="small muted" for="mBombs">TNT</label><select id="mBombs"><option>1</option><option selected>3</option><option>5</option><option>10</option><option>20</option></select><button type="button" class="g-btn" id="mGo">Start</button><button type="button" class="g-btn ghost" id="mCash" disabled>Auszahlen</button></div>
+    <div class="mines" id="mGrid"></div><p class="m-info" id="mInfo"></p><p class="cs-msg" id="mMsg"></p></div>
+</div></div></section>
+</main>
+<footer id="foot"></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

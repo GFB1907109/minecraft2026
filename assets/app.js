@@ -1542,55 +1542,181 @@ const Bot = (() => {
     players().map(p => p.name).find(n => n.length > 4 && q.includes(n.toLowerCase().slice(0, 5)));
   const statOf = q => { for (const [re, k] of KW) if (re.test(q)) return STATS.find(s => s.key === k); return null; };
   const link = (n) => `<a href="${plink(n)}">${esc(n)}</a>`;
+  const C = { galerie: [], projekte: [], infos: {}, downloads: null };
+  const loadC = async () => {
+    C.galerie = await loadContent("galerie"); C.projekte = await loadContent("projekte"); C.infos = await loadContent("infos", {});
+    try { const r = await fetch("downloads.json", { cache: "no-cache" }); if (r.ok) C.downloads = await r.json(); } catch {}
+  };
+  const PAGE_KW = [[/stat|bestenlist|rangliste|rekord/, "stats.html", "Stats"], [/tod|tode|gestorben/, "tode.html", "Tode"], [/spieler|profil/, "spieler.html", "Spieler"], [/aktivit|session|wer war wann|zeitstrahl/, "aktivitaet.html", "Aktivität"],
+    [/bingo|challenge/, "bingo.html", "Bingo"], [/casino|glücksrad|lose|roulette|slot|blackjack|münz/, "casino.html", "Casino"], [/wrapped|rückblick|monat/, "wrapped.html", "Wrapped"], [/discord/, "discord.html", "Discord"],
+    [/galerie|bilder|screenshot|foto/, "galerie.html", "Galerie"], [/projekt|orte|bauwerk/, "projekte.html", "Projekte & Orte"], [/erfolg|fortschritt|achievement|advancement/, "erfolge.html", "Erfolge"],
+    [/archiv|download|backup|welt herunter|staffel/, "archiv.html", "Archiv & Downloads"], [/regel|info/, "infos.html", "Infos & Regeln"]];
+  const list = (arr, f) => arr.map(f).join("<br>");
+  const top3 = (key, low) => players().slice().sort((a, b) => low ? val(a, key) - val(b, key) : val(b, key) - val(a, key)).slice(0, 3);
+  const medal = i => ["🥇","🥈","🥉"][i] || "•";
+  const prof = p => App.stats?.profiles?.[p.uuid];
+  const allPlayers = q => players().map(p => p.name).filter(n => q.includes(n.toLowerCase()));
+  const advAll = () => players().flatMap(p => advDone(p).map(([id, t]) => ({ p: p.name, id, t })));
   function answer(raw){
     const q = norm(raw), S = App.stats, L = App.live;
     if (!q.trim()) return "Frag mich was über den Server 🙂";
-    if (/^(hi|hallo|hey|moin|servus|yo|selam|merhaba)\b/.test(q)) return `Hey! Ich bin der Server-Bot von ${esc(CONFIG.name)}. Frag mich zum Beispiel „Wer hat die meisten Tode?“ oder „Wie lange hat ${esc(players()[0]?.name || "Steve")} gespielt?“`;
-    if (/hilfe|help|was kannst|befehle/.test(q)) return "Ich kenne die Server-Daten. Frag zum Beispiel:<br>• Wer ist online?<br>• Wer hat die meisten Diamanten?<br>• Wie viele Tode hat <i>Name</i>?<br>• Wer war zuletzt online?<br>• Wie ist die IP?<br>• Wie ist der letzte Tod passiert?<br>• Infos über <i>Name</i>";
-    if (/\bip\b|adresse|beitreten|joinen|verbinden/.test(q)) return `Die Adresse ist <b>${esc(addr)}</b>. Version ${esc(CONFIG.software)} ${esc(CONFIG.version)}.`;
-    if (/version|fabric|mods?\b/.test(q) && !findPlayer(q)) return `Wir spielen ${esc(CONFIG.software)} ${esc(CONFIG.version)}${S?.mods?.length ? ` mit ${S.mods.length} Mods` : ""}.`;
-    if (/discord/.test(q)) return CONFIG.discord?.invite ? `Hier geht's zum Discord: <a href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener">${esc(CONFIG.discord.invite)}</a>` : "Discord ist noch nicht eingetragen.";
-    if (/online|wer spielt|gerade (da|drauf)/.test(q) && !/zuletzt|letzte/.test(q)) {
+    if (/^(hi|hallo|hey|moin|servus|yo|selam|merhaba|na)\b/.test(q)) return `Hey! Ich bin der Server-Bot von ${esc(CONFIG.name)} und kenne alles, was auf der Website steht. Schreib <b>Hilfe</b> für Beispiele.`;
+    if (/hilfe|help|was kannst|befehle|was weißt/.test(q)) return `Ich weiß zum Beispiel:<br>
+      • <b>Stats</b>: Wer hat die meisten Diamanten? · Wie viele Tode hat <i>Name</i>?<br>
+      • <b>Spieler</b>: Infos über <i>Name</i> · Was hat <i>Name</i> im Inventar? · Wo ist <i>Name</i>? · Erzfeind von <i>Name</i><br>
+      • <b>Vergleich</b>: <i>Name</i> gegen <i>Name</i><br>
+      • <b>Live</b>: Wer ist online? · Wer war zuletzt da?<br>
+      • <b>Tode</b>: Letzter Tod · Woran sterben wir am meisten? · Wall of Shame<br>
+      • <b>Erfolge</b>: Wer hat die meisten Erfolge? · Neueste Erfolge · Wer hat „Diamanten!“?<br>
+      • <b>Abzeichen</b> · <b>Bingo</b> · <b>Spieler der Woche</b> · <b>Rekorde</b><br>
+      • <b>Welt</b>: Welcher Tag? Wetter? Spawn?<br>
+      • <b>Website</b>: Downloads · Galerie · Regeln · Casino · Discord · IP · Mods`;
+    if (/\bip\b|adresse|beitreten|joinen|verbinden|wie komm/.test(q)) return `Die Adresse ist <b>${esc(addr)}</b>. Version ${esc(CONFIG.software)} ${esc(CONFIG.version)}.`;
+    if (/\bmods?\b/.test(q)) return S?.mods?.length ? `Auf dem Server laufen ${S.mods.length} Mods:<br>${esc(S.mods.slice(0, 25).map(m => m.name || m).join(", "))}${S.mods.length > 25 ? " …" : ""}` : "Ich kenne keine Mods vom Server.";
+    if (/version|fabric/.test(q)) return `Wir spielen ${esc(CONFIG.software)} ${esc(CONFIG.version)}.`;
+    if (/discord/.test(q)) return CONFIG.discord?.invite ? `Hier geht's zum Discord: <a href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener">${esc(CONFIG.discord.invite)}</a>. Mehr auf der <a href="discord.html">Discord-Seite</a>.` : "Discord ist noch nicht eingetragen.";
+    if (/wo finde|welche seite|wo steht|wo sehe|seite für|zeig mir/.test(q)) { for (const [re, f, n] of PAGE_KW) if (re.test(q)) return `Das findest du auf der Seite <a href="${f}">${n}</a>.`; return `Seiten: ${PAGES.map(([f, n]) => `<a href="${f}">${n}</a>`).join(" · ")}`; }
+    if (/online|wer spielt gerade|gerade (da|drauf)/.test(q) && !/zuletzt|letzte/.test(q)) {
       if (!L.checked) return "Ich prüfe den Server gerade, frag gleich nochmal.";
       if (!L.online) return "Der Server ist gerade offline.";
-      return L.players?.length ? `Gerade online (${L.players.length}/${L.max}): ${L.players.map(link).join(", ")}` : "Gerade ist niemand online.";
+      return L.players?.length ? `Gerade online (${L.players.length}/${L.max}): ${L.players.map(link).join(", ")}` : `Der Server läuft, aber gerade ist niemand online (0/${L.max}).`;
     }
+    if (/casino|glücksrad|roulette|slot|blackjack|creeper 21|münzwurf/.test(q)) return `Im <a href="casino.html">Casino</a> gibt es Glücksrad, Lose, Redstone-Roulette, Creeper 21 (Blackjack), Slots und Münzwurf. Gespielt wird mit Spiel-Diamanten: Du startest mit 100, und wer pleite ist, bekommt einmal am Tag 30 Nachschub. Du hast gerade <b>${nf.format(Bank.get())} 💎</b>.`;
+    if (/wrapped/.test(q)) return `Bei <a href="wrapped.html">Wrapped</a> gibt es deinen Monatsrückblick als Slideshow: Spielzeit, Tode, Lieblingsbeschäftigung, Erzfeind und mehr.`;
     if (!S) return "Die Daten laden noch, einen Moment …";
-    if (/zuletzt|letzte[rn]? online|wann war/.test(q)) {
-      const ls = lastSeen(), p = findPlayer(q);
-      if (p) return ls[p] ? `${link(p)} war zuletzt ${when(ls[p])} da.` : `Zu ${link(p)} habe ich noch keine Zeit gespeichert.`;
-      const top = Object.entries(ls).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 3);
-      return top.length ? "Zuletzt da:<br>" + top.map(([n, t]) => `• ${link(n)}: ${when(t)}`).join("<br>") : "Noch keine Daten.";
+    const ps = players(), names = allPlayers(q), p = findPlayer(q), pl = p && ps.find(x => x.name === p), st = statOf(q);
+
+    // Vergleich
+    if (names.length >= 2 && /gegen|vs|vergleich|oder|besser/.test(q)) {
+      const [A, B] = names.slice(0, 2).map(n => ps.find(x => x.name === n));
+      const keys = st ? [st] : ["play","deaths","mobs","mined","diamond","dist"].map(k => STATS.find(s => s.key === k));
+      let a = 0, b = 0;
+      const rows = keys.map(s => { const va = val(A, s.key), vb = val(B, s.key), better = s.key === "deaths" ? va < vb : va > vb; if (va !== vb) better ? a++ : b++;
+        return `• ${esc(s.label)}: ${va !== vb && better ? "<b>" : ""}${s.fmt(va)}${va !== vb && better ? "</b>" : ""} : ${va !== vb && !better ? "<b>" : ""}${s.fmt(vb)}${va !== vb && !better ? "</b>" : ""}`; });
+      return `<b>${link(A.name)} gegen ${link(B.name)}</b><br>${rows.join("<br>")}<br>${a === b ? "Unentschieden!" : `Punkte gehen an ${link(a > b ? A.name : B.name)} (${Math.max(a, b)}:${Math.min(a, b)})`}`;
     }
-    if (/letzte[rn]? tod|zuletzt gestorben|wie .* gestorben/.test(q)) {
-      const p = findPlayer(q), d = deaths().filter(x => !p || x.p === p).pop();
-      return d ? `${link(d.p)} ${esc(d.de)} (${when(d.t)}).` : "Noch keine Tode gespeichert. 🎉";
+    // Inventar / Enderkiste
+    if (/inventar|dabei|items|ausrüstung|rüstung|enderkiste|ender chest|was hat .* (an|bei)/.test(q)) {
+      if (!pl) return "Von welchem Spieler? Schreib zum Beispiel: <i>Was hat " + esc(ps[0]?.name || "Steve") + " im Inventar?</i>";
+      const pr = prof(pl); if (!pr) return `Von ${link(p)} habe ich noch keine Inventardaten.`;
+      const src = /ender/.test(q) ? pr.ender : pr.inv; if (!src?.length) return `${link(p)} hat da gerade nichts drin.`;
+      const sum = {}; for (const it of src) sum[it.id] = (sum[it.id] || 0) + (it.n || 1);
+      const items = Object.entries(sum).sort((x, y) => y[1] - x[1]).slice(0, 12);
+      return `${/ender/.test(q) ? "Enderkiste" : "Inventar"} von ${link(p)} (Auszug):<br>${list(items, ([id, n]) => `• ${n}× ${esc(deItem(id))}`)}<br><a href="${plink(p)}">Alles im Profil ansehen →</a>`;
     }
-    if (/welt|seed|tag \d|wie alt|schwierigkeit/.test(q)) { const w = S.world || {}; return `Die Welt${w.day ? ` ist bei Tag ${nf.format(w.day)}` : ""}${w.difficulty ? `, Schwierigkeit ${esc(w.difficulty)}` : ""}.`; }
-    if (/casino|glücksrad|lose/.test(q)) return `Im <a href="casino.html">Casino</a> gibt es Glücksrad, Lose, Roulette, Creeper 21, Slots und Münzwurf.`;
-    if (/bingo|challenge/.test(q)) return `Das <a href="bingo.html">Wochen-Bingo</a> hat jede Woche neue Aufgaben.`;
-    const st = statOf(q), p = findPlayer(q);
-    if (p) {
-      const pl = players().find(x => x.name === p);
-      if (st) { const rank = players().slice().sort((a, b) => val(b, st.key) - val(a, st.key)).findIndex(x => x.name === p) + 1;
-        return `${link(p)} – ${esc(st.label)}: <b>${st.fmt(val(pl, st.key))}</b> (Platz ${rank} von ${players().length}).`; }
-      return `<b>${link(p)}</b><br>• Spielzeit: ${H(val(pl, "play"))}<br>• Tode: ${nf.format(val(pl, "deaths"))}<br>• Mobs getötet: ${nf.format(val(pl, "mobs"))}<br>• Diamanterz: ${nf.format(val(pl, "diamond"))}<br>• Strecke: ${STATS.find(s => s.key === "dist").fmt(val(pl, "dist"))}`;
+    // Position
+    if (/\bwo ist\b|wo steht|position|koordinat|wo befindet/.test(q) && pl) { const pr = prof(pl); return pr?.pos ? `${link(p)} war beim letzten Abgleich ${({ overworld: "in der", the_nether: "im", the_end: "im" })[pr.dim] || "in"} <b>${esc(DIM[pr.dim] || pr.dim)}</b> bei <b>${pr.pos.join(" / ")}</b>.` : `Die Position von ${link(p)} kenne ich noch nicht.`; }
+    // Leben/Level
+    if (/leben|herz|hunger|level|xp|erfahrung/.test(q) && pl) { const pr = prof(pl); return pr ? `${link(p)}: ${nf1.format(pr.health / 2)} von 10 Herzen, Hunger ${pr.food ?? "?"}/20, Level <b>${pr.xp}</b>.` : `Dazu habe ich von ${link(p)} keine Daten.`; }
+    // Erzfeind
+    if (/erzfeind|nemesis|wer tötet|getötet von|killt .* am meisten/.test(q)) {
+      if (pl) { const kb = pl.killedBy || []; return kb.length ? `Der Erzfeind von ${link(p)} ist <b>${esc(entName(kb[0][0]))}</b> (${kb[0][1]}× getötet)${kb[1] ? `, danach ${kb.slice(1).map(([k, n]) => `${esc(entName(k))} (${n}×)`).join(", ")}` : ""}.` : `${link(p)} hat noch keinen Erzfeind.`; }
+      const all = {}; for (const x of ps) for (const [k, n] of x.killedBy || []) all[k] = (all[k] || 0) + n;
+      const t = Object.entries(all).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      return t.length ? "Die gefährlichsten Gegner auf dem Server:<br>" + list(t, ([k, n], i) => `${medal(i)} ${esc(entName(k))}: ${n} Kills`) : "Noch keine Daten.";
     }
-    if (st) {
-      const low = /wenigste|am seltensten|niedrig/.test(q);
-      const list = players().slice().sort((a, b) => low ? val(a, st.key) - val(b, st.key) : val(b, st.key) - val(a, st.key)).slice(0, 3);
-      return `${low ? "Am wenigsten" : "Am meisten"} ${esc(st.label)}:<br>` + list.map((x, i) => `${["🥇","🥈","🥉"][i]} ${link(x.name)}: <b>${st.fmt(val(x, st.key))}</b>`).join("<br>");
+    // Todesursachen
+    if (/woran|todesursache|wie sterben|häufigste/.test(q)) {
+      const c = {}; for (const d of deaths().filter(d => !pl || d.p === p)) c[d.cause] = (c[d.cause] || 0) + 1;
+      const t = Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      return t.length ? `Häufigste Todesursachen${pl ? " von " + link(p) : ""}:<br>` + list(t, ([k, n], i) => `${medal(i)} ${esc(k)}: ${n}×`) : "Noch keine Tode gespeichert. 🎉";
     }
-    if (/wie viele spieler|anzahl spieler|wer spielt (hier|mit)/.test(q)) return `Auf dem Server spielen ${players().length} Leute: ${players().map(x => link(x.name)).join(", ")}.`;
-    if (/danke|thx|merci/.test(q)) return "Gern! 💎";
-    return "Das weiß ich leider nicht. Ich kenne nur die Server-Daten. Schreib <b>Hilfe</b>, dann zeige ich dir Beispiele.";
+    if (/shame|peinlich|dümmste|dumm/.test(q)) { const d = deaths().filter(d => d.shame).slice(-5).reverse(); return d.length ? "Wall of Shame (peinlichste Tode):<br>" + list(d, x => `• ${link(x.p)} ${esc(x.de)} (${when(x.t)})`) : "Die Wall of Shame ist noch leer."; }
+    if (/zuletzt|letzte[rn]? online|wann war/.test(q) && !/tod|gestorben|erfolg/.test(q)) {
+      const ls = lastSeen();
+      if (p) return isOnline(p) ? `${link(p)} ist gerade online! 🟢` : ls[p] ? `${link(p)} war zuletzt ${when(ls[p])} da.` : `Zu ${link(p)} habe ich noch keine Zeit gespeichert.`;
+      const t = Object.entries(ls).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 5);
+      return t.length ? "Zuletzt da:<br>" + list(t, ([n, t]) => `• ${link(n)}: ${isOnline(n) ? "gerade online" : when(t)}`) : "Noch keine Daten.";
+    }
+    if (/letzte[rn]? tod|zuletzt gestorben|wie .* gestorben|tode? (heute|gestern)/.test(q)) {
+      const d = deaths().filter(x => !p || x.p === p).slice(-3).reverse();
+      return d.length ? (d.length > 1 ? "Letzte Tode:<br>" : "") + list(d, x => `• ${link(x.p)} ${esc(x.de)} (${when(x.t)})`) : "Noch keine Tode gespeichert. 🎉";
+    }
+    // Erfolge
+    if (/erfolg|fortschritt|achievement|advancement/.test(q)) {
+      if (/neu|zuletzt|letzte/.test(q)) { const r = advAll().filter(x => x.t && (!p || x.p === p)).sort((a, b) => b.t.localeCompare(a.t)).slice(0, 5);
+        return r.length ? "Zuletzt geschafft:<br>" + list(r, x => `• ${link(x.p)}: <b>${esc(advName(x.id))}</b> (${when(x.t.replace(" ", "T"))})`) : "Noch keine Erfolge erfasst."; }
+      if (pl) { const d = advDone(pl); return `${link(p)} hat <b>${d.length}</b> Fortschritte geschafft. Rang ${ps.slice().sort((a, b) => advDone(b).length - advDone(a).length).findIndex(x => x.name === p) + 1} von ${ps.length}. <a href="erfolge.html">Alle Erfolge →</a>`; }
+      const r = ps.slice().sort((a, b) => advDone(b).length - advDone(a).length).slice(0, 3);
+      return "Die meisten Fortschritte:<br>" + list(r, (x, i) => `${medal(i)} ${link(x.name)}: <b>${advDone(x).length}</b>`);
+    }
+    // Erfolg nach Name ("wer hat X")
+    if (/^wer hat /.test(q) && !st) {
+      const term = q.replace(/^wer hat (den |die |das )?/, "").replace(/ (geschafft|freigeschaltet|bekommen)/, "").trim();
+      if (term.length > 2) { const hits = advAll().filter(x => advName(x.id).toLowerCase().includes(term)); if (hits.length) { const nm = advName(hits[0].id);
+        const who = [...new Set(hits.filter(x => advName(x.id) === nm).map(x => x.p))]; return `<b>${esc(nm)}</b> haben geschafft: ${who.map(link).join(", ")}.${advDesc(hits[0].id) ? `<br><span class="small">${esc(advDesc(hits[0].id))}</span>` : ""}`; }
+        const bd = BADGES.find(b => b[1].toLowerCase().includes(term)); if (bd) { const who = ps.filter(x => badgesOf(x).find(b => b.id === bd[0]).has); return `Abzeichen <b>${esc(bd[1])}</b> (${esc(bd[2])}): ${who.length ? who.map(x => link(x.name)).join(", ") : "noch niemand"}.`; } }
+    }
+    // Abzeichen
+    if (/abzeichen|badge|orden/.test(q)) {
+      if (pl) { const b = badgesOf(pl).filter(x => x.has); return b.length ? `Abzeichen von ${link(p)} (${b.length}/${BADGES.length}): ${b.map(x => `<b>${esc(x.name)}</b>`).join(", ")}` : `${link(p)} hat noch keine Abzeichen.`; }
+      return "Diese Abzeichen gibt es:<br>" + list(BADGES, b => `• <b>${esc(b[1])}</b>: ${esc(b[2])} (${ps.filter(x => badgesOf(x).find(y => y.id === b[0]).has).length} Spieler)`);
+    }
+    // Bingo
+    if (/bingo|challenge|aufgabe/.test(q)) {
+      const ch = S.challenges || []; if (!ch.length) return "Diese Woche gibt es noch keine Bingo-Aufgaben.";
+      if (pl) { const done = ch.filter(c => bingoProgress(pl, c) >= c.target); return `${link(p)} hat <b>${done.length} von ${ch.length}</b> Bingo-Aufgaben geschafft${done.length ? ": " + done.map(c => esc(c.text)).join(", ") : ""}.`; }
+      return `Bingo dieser Woche:<br>${list(ch, c => `• ${esc(c.text)}${ps.some(x => bingoProgress(x, c) >= c.target) ? " ✅ " + ps.filter(x => bingoProgress(x, c) >= c.target).map(x => esc(x.name)).join(", ") : ""}`)}<br><a href="bingo.html">Zum Bingo →</a>`;
+    }
+    if (/spieler der woche|diese woche|woche/.test(q)) {
+      const r = ps.slice().sort((a, b) => weekDelta(b, "play") - weekDelta(a, "play")).slice(0, 3);
+      return r.length && weekDelta(r[0], "play") ? "Diese Woche am meisten gespielt:<br>" + list(r, (x, i) => `${medal(i)} ${link(x.name)}: ${H(weekDelta(x, "play"))} · ${nf.format(weekDelta(x, "deaths"))} Tode`) : "Diese Woche hat noch niemand gespielt.";
+    }
+    if (/rekord|spitzenreiter|bester in allem/.test(q)) {
+      const rec = STATS.filter(s => s.rec).map(s => { const b = top3(s.key)[0]; return b && val(b, s.key) ? `• ${esc(s.rec)}: ${link(b.name)} (${s.fmt(val(b, s.key))})` : null; }).filter(Boolean);
+      return rec.length ? "Die Rekorde:<br>" + rec.join("<br>") : "Noch keine Rekorde.";
+    }
+    // Welt
+    if (/welt|\btag\b|uhrzeit|wetter|regen|gewitter|spawn|schwierigkeit|hardcore|wie alt/.test(q) && !pl) {
+      const w = S.world || {}; const hr = Math.floor(((w.time || 0) / 1000 + 6) % 24);
+      return `Die Welt beim letzten Abgleich:<br>• Tag <b>${nf.format(w.day || 0)}</b><br>• Uhrzeit im Spiel: ca. ${hr}:00 Uhr<br>• Wetter: ${w.thundering ? "Gewitter ⛈️" : w.raining ? "Regen 🌧️" : "Klar ☀️"}<br>• Schwierigkeit: ${esc(w.difficulty || "?")}${w.hardcore ? " (Hardcore)" : ""}${w.spawn ? `<br>• Spawn: ${w.spawn.join(" / ")}` : ""}`;
+    }
+    if (/staffel|season/.test(q)) { const se = S.season, old = S.seasons || []; return `Wir sind in <b>Staffel ${se?.n || 1}</b>${se?.from ? ` (seit ${fmtDate(se.from)})` : ""}. ${old.length ? `Im <a href="archiv.html">Archiv</a> gibt es ${old.length} alte Staffeln.` : "Alte Staffeln gibt es noch nicht."}`; }
+    if (/download|backup|sicherung|welt herunter|runterladen/.test(q)) {
+      const r = (C.downloads || []).filter(x => x.assets?.length)[0];
+      return r ? `Die neueste Welt-Sicherung ist vom <b>${fmtDate(r.published_at)}</b>. Herunterladen kannst du sie im <a href="archiv.html">Archiv</a>. Neue Sicherungen kommen jeden Sonntag.` : `Welt-Sicherungen gibt es im <a href="archiv.html">Archiv</a>, jeden Sonntag eine neue.`;
+    }
+    if (/galerie|bild|foto|screenshot/.test(q)) { const g = C.galerie || []; return g.length ? `In der <a href="galerie.html">Galerie</a> sind ${g.length} Bilder, zum Beispiel: ${g.slice(-4).reverse().map(x => `<b>${esc(x.titel)}</b>`).join(", ")}.` : "Die Galerie ist noch leer."; }
+    if (/projekt|orte|bauwerk|gebaut|basis/.test(q) && !st) { const pr = C.projekte || []; return pr.length ? `Projekte & Orte:<br>${list(pr.slice(0, 8), x => `• <b>${esc(x.name || x.titel)}</b>${x.x != null ? ` (${x.x} / ${x.z})` : ""}`)}` : `Auf der Seite <a href="projekte.html">Projekte & Orte</a> ist noch nichts eingetragen.`; }
+    if (/regel|erlaubt|verboten|darf man/.test(q)) { const r = C.infos?.regeln || []; return r.length ? "Die Regeln:<br>" + list(r, (x, i) => `${i + 1}. ${esc(x.titel || x)}`) : `Es sind noch keine Regeln eingetragen. Grundsätzlich: fair spielen, nichts kaputt machen. 😉`; }
+    if (/chat|geschrieben|nachricht|quatscht|redet/.test(q)) {
+      const c = {}; for (const e of App.events) if (e[1] === "c") c[e[2]] = (c[e[2]] || 0) + 1;
+      if (/letzte/.test(q)) { const m = App.events.filter(e => e[1] === "c").slice(-3).reverse(); return m.length ? "Letzte Chat-Nachrichten:<br>" + list(m, e => `• <b>${esc(e[2])}</b>: ${esc(e[3])}`) : "Noch kein Chat gespeichert."; }
+      const t = Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      return t.length ? "Am meisten im Chat:<br>" + list(t, ([n, k], i) => `${medal(i)} ${link(n)}: ${k} Nachrichten`) : "Noch kein Chat gespeichert.";
+    }
+    if (/session|am längsten am stück|heute gespielt|heute online/.test(q)) {
+      const ss = sessions().map(x => ({ ...x, d: sessionEnd(x) - toDate(x.from) }));
+      if (/heute/.test(q)) { const d = new Date().toISOString().slice(0, 10); const t = {}; for (const x of ss.filter(x => x.from.slice(0, 10) === d)) t[x.p] = (t[x.p] || 0) + x.d;
+        const r = Object.entries(t).sort((a, b) => b[1] - a[1]); return r.length ? "Heute online:<br>" + list(r, ([n, ms]) => `• ${link(n)}: ${Math.round(ms / 6e4)} Min.`) : "Heute war noch niemand online."; }
+      const best = ss.filter(x => !p || x.p === p).sort((a, b) => b.d - a.d)[0];
+      return best ? `Längste Session${p ? " von " + link(p) : ""}: ${link(best.p)} mit <b>${nf1.format(best.d / 36e5)} Std.</b> am ${fmtDate(best.from)}.` : "Noch keine Sessions gespeichert.";
+    }
+    if (/zusammen|gesamt|insgesamt|alle zusammen|server gesamt/.test(q) && !pl) {
+      const sum = k => ps.reduce((a, x) => a + val(x, k), 0);
+      if (st) return `Alle zusammen – ${esc(st.label)}: <b>${st.fmt(sum(st.key))}</b>`;
+      return `Alle zusammen:<br>• ${H(sum("play"))} gespielt<br>• ${nf.format(sum("deaths"))} Tode<br>• ${nf.format(sum("mobs"))} Mobs getötet<br>• ${nf.format(sum("mined"))} Blöcke abgebaut<br>• ${nf.format(sum("diamond"))} Diamanterz`;
+    }
+    if (pl) {
+      if (st) { const rank = ps.slice().sort((a, b) => val(b, st.key) - val(a, st.key)).findIndex(x => x.name === p) + 1;
+        return `${link(p)} – ${esc(st.label)}: <b>${st.fmt(val(pl, st.key))}</b> (Platz ${rank} von ${ps.length}).`; }
+      const pr = prof(pl), b = badgesOf(pl).filter(x => x.has), kb = pl.killedBy?.[0], ls = lastSeen()[p];
+      return `<b>${link(p)}</b> ${isOnline(p) ? "🟢 online" : ls ? `<span class="small">(zuletzt ${when(ls)})</span>` : ""}<br>• Spielzeit: ${H(val(pl, "play"))} (Platz ${ps.slice().sort((a, b) => val(b, "play") - val(a, "play")).findIndex(x => x.name === p) + 1})<br>• Tode: ${nf.format(val(pl, "deaths"))} · Mobs: ${nf.format(val(pl, "mobs"))}<br>• Diamanterz: ${nf.format(val(pl, "diamond"))} · Strecke: ${STATS.find(s => s.key === "dist").fmt(val(pl, "dist"))}<br>• Fortschritte: ${advDone(pl).length}${b.length ? ` · Abzeichen: ${b.map(x => esc(x.name)).join(", ")}` : ""}${kb ? `<br>• Erzfeind: ${esc(entName(kb[0]))}` : ""}${pr ? `<br>• Level ${pr.xp} · ${esc(DIM[pr.dim] || pr.dim)}` : ""}<br><a href="${plink(p)}">Zum Profil →</a>`;
+    }
+    if (st) { const low = /wenigste|am seltensten|niedrig|schlechteste/.test(q);
+      return `${low ? "Am wenigsten" : "Am meisten"} ${esc(st.label)}:<br>` + list(top3(st.key, low), (x, i) => `${medal(i)} ${link(x.name)}: <b>${st.fmt(val(x, st.key))}</b>`); }
+    if (/wie viele spieler|welche spieler|wer spielt|alle spieler|spielerliste/.test(q)) return `Auf dem Server spielen ${ps.length} Leute: ${ps.map(x => link(x.name)).join(", ")}.`;
+    if (/danke|thx|merci|nice|cool|geil/.test(q)) return "Gern! 💎";
+    for (const [re, f, n] of PAGE_KW) if (re.test(q)) return `Dazu schau mal auf die Seite <a href="${f}">${n}</a>.`;
+    return "Das weiß ich leider nicht. Schreib <b>Hilfe</b>, dann zeige ich dir, was ich alles weiß.";
   }
   function ui(){
+    loadC();
     const box = document.createElement("div"); box.className = "bot";
     box.innerHTML = `<button type="button" class="bot-fab" id="botFab" aria-label="Server-Bot öffnen">🤖</button>
       <div class="bot-win" id="botWin" hidden><div class="bot-head"><span>🤖 Server-Bot</span><button type="button" id="botX" aria-label="Schließen">✕</button></div>
       <div class="bot-log" id="botLog"></div>
-      <div class="bot-chips">${["Wer ist online?","Meiste Tode?","Meiste Spielzeit?","Wer war zuletzt da?","IP?"].map(t => `<button type="button" data-q="${t}">${t}</button>`).join("")}</div>
+      <div class="bot-chips">${["Hilfe","Wer ist online?","Meiste Tode?","Rekorde","Neueste Erfolge","Bingo","Woran sterben wir?","Welt"].map(t => `<button type="button" data-q="${t}">${t}</button>`).join("")}</div>
       <form class="bot-in" id="botForm"><input id="botQ" autocomplete="off" placeholder="Frag mich was …" aria-label="Frage"><button type="submit">➤</button></form></div>`;
     document.body.appendChild(box);
     const log = $("botLog");

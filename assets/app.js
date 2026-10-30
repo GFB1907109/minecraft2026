@@ -1001,24 +1001,33 @@ function bjInit(){
 
 /* ---------- Glücksrad & Lose ziehen ---------- */
 function luckInit(){
-  const ta = $("luckList"); let draw;
-  const load = () => { try { return localStorage.getItem("mc26_luck"); } catch { return null; } };
-  ta.value = load() || players().map(p => p.name).join("\n") || "Sulaiii\nGFB1907\nMattheus05\nmoo259\nInsider07\nDiddylikeapiddy";
-  const items = () => ta.value.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 30);
-  ta.oninput = () => { try { localStorage.setItem("mc26_luck", ta.value); } catch {} draw(); $("lotList").innerHTML = ""; };
-  draw = gameWheel("luckWheel", "luckGo", "luckOut", () => items().length ? items() : ["?"], ["#7bd34f","#f5c542","#e2557b","#5ad1f0","#b38cf5","#ffa14a","#4fd1a5","#f08a5d"]);
-  document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
-    ta.value = b.dataset.preset === "spieler" ? (players().map(p => p.name).join("\n") || ta.value) : b.dataset.preset.split("|").join("\n"); ta.oninput(); });
+  const def = "Sulaiii\nGFB1907\nMattheus05\nmoo259\nInsider07\nDiddylikeapiddy";
+  const load = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const listOf = ta => ta.value.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 30);
+  const setup = (taId, key, after) => {
+    const ta = $(taId); ta.value = load(key) || players().map(p => p.name).join("\n") || def;
+    ta.oninput = () => { try { localStorage.setItem(key, ta.value); } catch {} after(); };
+    ta.closest(".cs-game").querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+      ta.value = b.dataset.preset === "spieler" ? (players().map(p => p.name).join("\n") || def) : b.dataset.preset.split("|").join("\n"); ta.oninput(); });
+    return () => listOf(ta);
+  };
+  let draw = () => {};
+  const wheelItems = setup("luckList", "mc26_luck", () => draw());
+  draw = gameWheel("luckWheel", "luckGo", "luckOut", () => wheelItems().length ? wheelItems() : ["?"], ["#7bd34f","#f5c542","#e2557b","#5ad1f0","#b38cf5","#ffa14a","#4fd1a5","#f08a5d"]);
+  const lotItems = setup("losList", "mc26_lose", () => { $("lotList").innerHTML = ""; });
+  let busy = false;
   $("lotGo").onclick = () => {
-    const list = shuffle(items()); if (!list.length) return;
-    const n = Math.min(list.length, Math.max(1, +$("lotN").value || 1));
-    $("lotList").innerHTML = list.slice(0, n).map((x, i) => `<div class="lot" style="animation-delay:${i * .25}s"><span>${i + 1}.</span><b>${esc(x)}</b></div>`).join("");
+    if (busy) return; const list = shuffle(lotItems()); if (!list.length) return;
+    const n = Math.min(list.length, Math.max(1, +$("lotN").value || 1)); busy = true;
+    $("losBox").classList.remove("shake3d"); void $("losBox").offsetWidth; $("losBox").classList.add("shake3d"); Sound.play("card");
+    $("lotList").innerHTML = list.slice(0, n).map((x, i) => `<div class="ticket" style="--d:${.7 + i * .45}s"><div class="t-in"><div class="t-face t-back">?</div><div class="t-face t-front"><span>${i + 1}.</span><b>${esc(x)}</b></div></div></div>`).join("");
+    [...$("lotList").children].forEach((t, i) => setTimeout(() => { t.classList.add("open"); Sound.play(i === n - 1 ? "win" : "plop"); if (i === n - 1) { busy = false; if (n === 1) confetti(); } }, 1300 + i * 450));
   };
 }
 
 function casinoTabs(){
   const tabs = [...document.querySelectorAll(".cs-tab")], panels = [...document.querySelectorAll(".cs-game")];
-  const show = id => { tabs.forEach(t => t.classList.toggle("on", t.dataset.g === id)); panels.forEach(p => { const on = p.id === id; p.hidden = !on; if (on) { p.classList.remove("enter"); void p.offsetWidth; p.classList.add("enter"); } });
+  const show = id => { if (id === "gLuck" || id === "gLos") document.dispatchEvent(new Event("wheelshow")); tabs.forEach(t => t.classList.toggle("on", t.dataset.g === id)); panels.forEach(p => { const on = p.id === id; p.hidden = !on; if (on) { p.classList.remove("enter"); void p.offsetWidth; p.classList.add("enter"); } });
     try { localStorage.setItem("mc26_game", id); } catch {} };
   tabs.forEach(t => t.onclick = () => show(t.dataset.g));
   let start = "gLuck"; try { start = localStorage.getItem("mc26_game") || start; } catch {}

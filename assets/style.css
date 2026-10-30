@@ -667,3 +667,39 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 
 .cside{backface-visibility:visible!important;transform:none!important}
 .coin3d .cside.creeper{display:none}.coin3d.cr .cside.creeper{display:block}.coin3d.cr .cside.steve{display:none}
+
+/* ===== 3D-Räder (gerade, mit Rand, Glanz und Ständer) ===== */
+.cs-tabs{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media (max-width:640px){.cs-tabs{grid-template-columns:repeat(3,1fr)}}
+.wheel3d{position:relative;width:min(100%,340px);margin:.5rem auto 3.2rem;filter:drop-shadow(0 22px 22px #000b)}
+.w-rim{position:relative;border-radius:50%;padding:14px;background:radial-gradient(circle at 30% 25%,#ffe9a0,#d9a72b 45%,#7a520c 100%);box-shadow:inset 0 -8px 14px #0008,inset 0 6px 10px #fff6,0 10px 0 #6d4a0a,0 14px 0 #4a3206}
+.w-rim::before{content:"";position:absolute;inset:4px;border-radius:50%;background:repeating-conic-gradient(#fff 0 2deg,transparent 2deg 22.5deg);-webkit-mask:radial-gradient(circle,transparent calc(100% - 8px),#000 calc(100% - 8px));mask:radial-gradient(circle,transparent calc(100% - 8px),#000 calc(100% - 8px));opacity:.9;animation:bulbs 1.2s steps(2) infinite}
+@keyframes bulbs{50%{opacity:.35}}
+.w-rim canvas{display:block;width:100%;height:auto;border-radius:50%;box-shadow:inset 0 0 0 3px #0005}
+.w-gloss{position:absolute;inset:14px;border-radius:50%;pointer-events:none;background:radial-gradient(ellipse at 35% 22%,#ffffff55,transparent 45%),radial-gradient(circle,transparent 60%,#0006)}
+.w-hub{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3c4,#d9a72b 55%,#7a520c);box-shadow:0 4px 8px #0009,inset 0 -3px 5px #0006}
+.w-pointer{position:absolute;left:50%;top:-14px;width:34px;height:42px;margin-left:-17px;background:linear-gradient(#ff6b6b,#b3261e);clip-path:polygon(0 0,100% 0,50% 100%);filter:drop-shadow(0 3px 2px #0009);z-index:2}
+.w-stand{position:absolute;left:50%;bottom:-46px;width:46%;height:46px;transform:translateX(-50%);background:linear-gradient(#a8740f,#5c3b06);clip-path:polygon(30% 0,70% 0,100% 100%,0 100%);z-index:-1;border-radius:4px}
+.wheel3d.roul .w-rim{background:radial-gradient(circle at 30% 25%,#c9a06a,#6b3f1b 50%,#2e1a08)}
+.wheel::after{display:none}
+/* ===== Lose ===== */
+.los-box{position:relative;width:180px;height:130px;margin:1rem auto 1.5rem;perspective:600px}
+.lb-body{position:absolute;inset:30px 0 0;border-radius:6px 6px 14px 14px;background:linear-gradient(90deg,#8b5a2b,#b07a3f 50%,#8b5a2b);box-shadow:inset 0 -10px 0 #6b4220,0 16px 24px #000a;display:grid;place-items:center;font:800 1.5rem var(--f-head,sans-serif);color:#ffe08a;letter-spacing:.2em;text-shadow:0 2px 0 #3a2300}
+.lb-lid{position:absolute;left:-6px;right:-6px;top:14px;height:24px;border-radius:6px;background:linear-gradient(#c9914a,#8b5a2b);box-shadow:0 4px 0 #6b4220;transform-origin:50% 100%;z-index:2}
+.lb-lid::after{content:"";position:absolute;left:30%;right:30%;top:8px;height:6px;border-radius:3px;background:#2a1a0a}
+.los-box.shake3d .lb-lid{animation:lid 1.1s ease}
+.los-box.shake3d{animation:boxshake 1.1s ease}
+@keyframes lid{30%,70%{transform:rotateX(-70deg) translateY(-6px)}}
+@keyframes boxshake{10%,30%,50%{transform:rotate(-4deg)}20%,40%,60%{transform:rotate(4deg)}}
+.tickets{display:grid;gap:.6rem;perspective:900px;text-align:left}
+.ticket{height:58px;animation:tIn .6s cubic-bezier(.2,.8,.3,1) both;animation-delay:var(--d)}
+@keyframes tIn{from{opacity:0;transform:translateY(-140px) scale(.4) rotate(-12deg)}}
+.t-in{position:relative;height:100%;transition:transform .6s cubic-bezier(.3,.8,.3,1);transform-style:preserve-3d}
+.t-face{position:absolute;inset:0;display:flex;align-items:center;gap:.7rem;padding:0 1rem;border-radius:10px;box-shadow:0 6px 14px #0007}
+.t-back{justify-content:center;font:800 1.6rem var(--f-head,sans-serif);color:#3a2300;background:repeating-linear-gradient(45deg,#f5c542 0 10px,#e0a826 10px 20px);border:3px dashed #8b5a2b}
+.t-front{visibility:hidden;background:#f8f4ec;color:#1c1426;font-size:1.15rem;border-left:8px solid #7bd34f}
+.t-front span{font:800 1rem var(--f-mono,monospace);color:#b3261e}
+.ticket.open .t-in{transform:rotateX(360deg)}
+.ticket.open .t-front{visibility:visible;transition:visibility 0s .3s}
+.ticket.open .t-back{visibility:hidden;transition:visibility 0s .3s}
+#losList{display:block;width:100%;min-height:180px;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.6rem .8rem;resize:vertical}

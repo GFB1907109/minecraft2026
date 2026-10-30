@@ -82,7 +82,7 @@ function buildChrome(){
     <div class="menu-panel" id="menuPanel">${PAGES.map(([f, n]) => `<a href="${f}"${cur(f)}>${n}</a>`).join("")}</div>
   </div>`;
   $("menuBtn")?.addEventListener("click", () => { const p = $("menuPanel"); const o = p.classList.toggle("open"); $("menuBtn").setAttribute("aria-expanded", o); $("menuBtn").textContent = o ? "Schließen" : "Menü"; });
-  document.addEventListener("click", e => { const d = document.querySelector("details.more"); if (d && !d.contains(e.target)) d.open = false; });
+  if (!buildChrome.once) { buildChrome.once = 1; document.addEventListener("click", e => { const d = document.querySelector("details.more"); if (d && !d.contains(e.target)) d.open = false; }); }
   const foot = $("foot");
   if (foot) foot.innerHTML = `<div class="wrap">
     <strong style="font-family:var(--f-display);font-size:1.4rem;letter-spacing:-.02em">${esc(CONFIG.name)}</strong>
@@ -1513,8 +1513,34 @@ function countdown(d){
 
 /* ---------- Start ---------- */
 buildChrome();
-PAGE_INIT[document.body.dataset.page]?.();
 Sound.ui();
+const BASE_SUBS = App.subs.slice();
+PAGE_INIT[document.body.dataset.page]?.();
+
+/* Seitenwechsel ohne Neuladen, damit die Musik weiterläuft */
+async function go(url, push = true){
+  try {
+    const r = await fetch(url, { cache: "no-cache" }); if (!r.ok) throw 0;
+    const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+    const main = doc.getElementById("inhalt"); if (!main) throw 0;
+    if (push) history.pushState({}, "", url);
+    document.title = doc.title;
+    document.body.dataset.page = doc.body.dataset.page || "";
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    $("inhalt").replaceWith(document.importNode(main, true));
+    App.subs = BASE_SUBS.slice();
+    buildChrome();
+    window.scrollTo(0, 0);
+    PAGE_INIT[document.body.dataset.page]?.();
+  } catch { location.href = url; }
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[href]"); if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || a.target || a.hasAttribute("download")) return;
+  const u = new URL(a.href, location.href);
+  if (u.origin !== location.origin || !/\.html$|\/$/.test(u.pathname) || (u.pathname === location.pathname && u.hash)) return;
+  e.preventDefault(); go(u.href);
+});
+addEventListener("popstate", () => go(location.href, false));
 loadStats();
 refreshLive();
 setInterval(refreshLive, CONFIG.refreshSeconds * 1000);

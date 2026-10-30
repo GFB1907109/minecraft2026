@@ -12,6 +12,8 @@ const CONFIG = {
   refreshSeconds: 30,
   github: "GFB1907109/minecraft2026",
   crew: [],         // Spieler, die immer angezeigt werden sollen, z. B. ["Steve","Alex"]
+  season: { name: "Saison 26/27", end: "2027-01-01T00:00:00+01:00", label: "Silvester 2026" },
+  city: { name: "Die Stadt", x: -842, y: 68, z: -1365 },
   discord: {
     invite: "https://discord.gg/M5Rr54WRMV",     // Einladungslink
     serverId: "1557866330714017823"    // Server-ID (Discord → Servereinstellungen → Widget)
@@ -1132,7 +1134,7 @@ const Sound = {
 const PAGE_INIT = {
 
   start(){
-    stars();
+    stars(); countdown3d();
     const parts = CONFIG.name.split(" "); const last = parts.pop();
     $("heroTitle").innerHTML = esc(parts.join(" ")) + (parts.length ? " " : "") + `<em>${esc(last)}</em>`;
     $("copyBtn").addEventListener("click", async () => {
@@ -1731,6 +1733,36 @@ const Bot = (() => {
   return { answer, ui };
 })();
 
+
+/* ---------- 3D-Countdown + Stadt (Startseite) ---------- */
+function countdown3d(){
+  const box = $("cd3d"); if (!box || !CONFIG.season) return;
+  const end = new Date(CONFIG.season.end), units = [["d","Tage"],["h","Std."],["m","Min."],["s","Sek."]];
+  box.innerHTML = units.map(([k, l], i) => `${i ? '<i class="fl-sep">:</i>' : ""}<div class="cdu"><div class="flap" id="cd_${k}"><div class="fl-top"><b>00</b></div><div class="fl-bot"><b>00</b></div><div class="fl-ft"><b>00</b></div><div class="fl-fb"><b>00</b></div></div><span>${l}</span></div>`).join("");
+  set("cdTitle", `${esc(CONFIG.season.name)} endet in`);
+  set("cdSub", `Am ${end.toLocaleDateString("de-DE", { dateStyle: "long" })} um ${end.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr · ${esc(CONFIG.season.label || "")}`);
+  const prev = {};
+  const tick = () => {
+    if (!document.body.contains(box)) return clearInterval(iv);
+    let s = Math.max(0, Math.floor((end - Date.now()) / 1000));
+    const v = { d: Math.floor(s / 86400), h: Math.floor(s / 3600) % 24, m: Math.floor(s / 60) % 60, s: s % 60 };
+    for (const [k] of units) {
+      const t = String(v[k]).padStart(2, "0"); if (prev[k] === t) continue; prev[k] = t;
+      const c = $("cd_" + k), old = c.querySelector(".fl-top b").textContent;
+      c.querySelector(".fl-ft b").textContent = old; c.querySelector(".fl-fb b").textContent = t;
+      c.querySelector(".fl-top b").textContent = t; c.querySelector(".fl-bot b").textContent = old;
+      c.classList.remove("go"); void c.offsetWidth; c.classList.add("go");
+      setTimeout(() => { c.querySelector(".fl-bot b").textContent = t; }, 600);
+    }
+    if (!s) { set("cdTitle", `${esc(CONFIG.season.name)} ist vorbei! 🎉`); clearInterval(iv); }
+  };
+  const iv = setInterval(tick, 1000); tick();
+  const c = CONFIG.city; if (c) {
+    set("cityName", esc(c.name));
+    set("cityXYZ", [["X", c.x], ["Y", c.y], ["Z", c.z]].map(([a, n]) => `<div class="xyz"><span>${a}</span><b>${n}</b></div>`).join("")); set("cityTp", `/tp @s ${c.x} ${c.y} ${c.z}`);
+    $("cityCopy").onclick = async () => { try { await navigator.clipboard.writeText(`${c.x} ${c.y} ${c.z}`); $("cityCopy").textContent = "Kopiert ✓"; setTimeout(() => $("cityCopy").textContent = "Koordinaten kopieren", 1800); } catch {} };
+  }
+}
 
 /* ---------- Start ---------- */
 buildChrome();

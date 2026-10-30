@@ -21,25 +21,31 @@
 <div class="bank"><span class="bank-big"><img src="https://minecraft.wiki/w/Special:FilePath/Invicon_Diamond.png" alt=""><span class="bank-v">100</span> Diamanten</span><button type="button" class="g-btn" id="bankRefill" hidden>Nachschub holen (+30)</button></div>
 
 <nav class="cs-tabs" aria-label="Spiel wählen">
-  <button type="button" class="cs-tab" data-g="gLuck"><span class="ct-ico">🎡</span><b>Glücksrad</b><small>&amp; Lose</small></button>
+  <button type="button" class="cs-tab" data-g="gLuck"><span class="ct-ico">🎡</span><b>Glücksrad</b><small>Entscheiden</small></button>
+  <button type="button" class="cs-tab" data-g="gLos"><span class="ct-ico">🎟️</span><b>Lose</b><small>Reihenfolge</small></button>
   <button type="button" class="cs-tab" data-g="gRoul"><span class="ct-ico">🔴</span><b>Roulette</b><small>Redstone</small></button>
   <button type="button" class="cs-tab" data-g="gBJ"><span class="ct-ico">🃏</span><b>Creeper 21</b><small>Blackjack</small></button>
   <button type="button" class="cs-tab" data-g="gSlot"><span class="ct-ico">🎰</span><b>Slots</b><small>Jackpot 50×</small></button>
   <button type="button" class="cs-tab" data-g="gCoin"><span class="ct-ico">🪙</span><b>Münzwurf</b><small>Steve / Creeper</small></button>
 </nav>
 
-<div class="panel cs-game" id="gLuck"><h2>Glücksrad &amp; Lose</h2><p class="small muted">Wenn ihr euch nicht einigen könnt: Trag Namen oder Sachen ein (eine pro Zeile), dann dreh das Rad oder zieh Lose für eine Reihenfolge.</p>
-  <div class="luck-grid">
-    <div><label class="small muted" for="luckList">Was steht zur Wahl?</label><textarea id="luckList" spellcheck="false"></textarea>
-      <div class="presets"><button type="button" class="g-btn ghost" data-preset="spieler">Alle Spieler</button><button type="button" class="g-btn ghost" data-preset="Nether|End|Mine|Bauen|Farmen|Erkunden">Was machen wir?</button><button type="button" class="g-btn ghost" data-preset="Ja|Nein">Ja / Nein</button><button type="button" class="g-btn ghost" data-preset="Holz farmen|Essen besorgen|Lager aufräumen|Mob-Farm bauen|Diamanten suchen|Straße bauen">Aufgaben</button></div>
-      <div class="cs-bet"><label class="small muted" for="lotN">Anzahl</label><input type="number" id="lotN" min="1" value="1"><button type="button" class="g-btn" id="lotGo">Lose ziehen</button></div>
-      <div class="lots" id="lotList"></div></div>
-    <div class="center"><div class="stage"><div class="wheel tilt"><canvas id="luckWheel" width="640" height="640"></canvas></div></div><p class="wheel-out" id="luckOut"></p><button type="button" class="g-btn big" id="luckGo">Rad drehen!</button></div>
+<div class="panel cs-game" id="gLuck"><h2>Glücksrad</h2><p class="small muted">Trag ein, was zur Wahl steht (eine Sache pro Zeile), und lass das Rad entscheiden.</p>
+  <div class="cs-split">
+    <div class="center"><div class="wheel3d"><div class="w-rim"><canvas id="luckWheel" width="640" height="640"></canvas><div class="w-gloss"></div><div class="w-hub"></div></div><div class="w-pointer"></div><div class="w-stand"></div></div>
+      <p class="wheel-out" id="luckOut"></p><button type="button" class="g-btn big" id="luckGo">Rad drehen!</button></div>
+    <div><label class="small muted" for="luckList">Auf dem Rad</label><textarea id="luckList" spellcheck="false"></textarea><div class="presets"><button type="button" class="g-btn ghost" data-preset="spieler">Alle Spieler</button><button type="button" class="g-btn ghost" data-preset="Nether|End|Mine|Bauen|Farmen|Erkunden">Was machen wir?</button><button type="button" class="g-btn ghost" data-preset="Ja|Nein">Ja / Nein</button><button type="button" class="g-btn ghost" data-preset="Holz farmen|Essen besorgen|Lager aufräumen|Mob-Farm bauen|Diamanten suchen|Straße bauen">Aufgaben</button></div></div>
+  </div></div>
+
+<div class="panel cs-game" id="gLos"><h2>Lose ziehen</h2><p class="small muted">Für eine Reihenfolge oder wenn mehrere ausgewählt werden sollen. Die Lose werden aus der Kiste gezogen und nacheinander aufgedeckt.</p>
+  <div class="cs-split">
+    <div><label class="small muted" for="losList">In der Lostrommel</label><textarea id="losList" spellcheck="false"></textarea><div class="presets"><button type="button" class="g-btn ghost" data-preset="spieler">Alle Spieler</button><button type="button" class="g-btn ghost" data-preset="Nether|End|Mine|Bauen|Farmen|Erkunden">Was machen wir?</button><button type="button" class="g-btn ghost" data-preset="Ja|Nein">Ja / Nein</button><button type="button" class="g-btn ghost" data-preset="Holz farmen|Essen besorgen|Lager aufräumen|Mob-Farm bauen|Diamanten suchen|Straße bauen">Aufgaben</button></div>
+      <div class="cs-bet"><label class="small muted" for="lotN">Wie viele Lose?</label><input type="number" id="lotN" min="1" value="1"><button type="button" class="g-btn big" id="lotGo">Ziehen!</button></div></div>
+    <div class="center"><div class="los-box" id="losBox"><div class="lb-lid"></div><div class="lb-body">LOSE</div></div><div class="tickets" id="lotList"></div></div>
   </div></div>
 
 <div class="panel cs-game" id="gRoul"><h2>Redstone-Roulette</h2><p class="small muted">Redstone ist Rot, Kohle ist Schwarz, Smaragd ist die 0. Eine Farbe zahlt das Doppelte, eine genaue Zahl das 36-fache.</p>
   <div class="cs-split">
-    <div class="stage"><div class="r-wrap tilt"><canvas id="rWheel" width="600" height="600"></canvas></div></div>
+    <div class="center"><div class="wheel3d roul"><div class="w-rim"><canvas id="rWheel" width="600" height="600"></canvas><div class="w-gloss"></div></div><div class="w-pointer"></div><div class="w-stand"></div></div></div>
     <div><div class="r-bets"><button type="button" class="g-btn r-red on" data-r="red">Redstone</button><button type="button" class="g-btn r-black" data-r="black">Kohle</button><button type="button" class="g-btn r-green" data-r="green">Smaragd 0</button><button type="button" class="g-btn ghost" data-r="odd">Ungerade</button><button type="button" class="g-btn ghost" data-r="even">Gerade</button><button type="button" class="g-btn ghost" data-r="low">1–18</button><button type="button" class="g-btn ghost" data-r="high">19–36</button><input type="number" min="0" max="36" id="rNum" placeholder="Zahl" aria-label="Genaue Zahl"></div>
       <div class="cs-bet"><label class="small muted" for="rBet">Einsatz 💎</label><input type="number" min="1" id="rBet" value="10"><button type="button" class="g-btn ghost" data-bet="half" data-for="rBet">½</button><button type="button" class="g-btn ghost" data-bet="x2" data-for="rBet">2×</button><button type="button" class="g-btn ghost" data-bet="max" data-for="rBet">Alles</button></div><button type="button" class="g-btn big" id="rGo">Kugel werfen!</button>
       <p class="cs-msg" id="rMsg"></p><p class="small muted" style="margin:.4rem 0 0">Letzte Zahlen</p><div class="r-last" id="rLast"></div></div>

@@ -1255,8 +1255,8 @@ const PAGE_INIT = {
   galerie(){
     loadContent("galerie").then(list => {
       if (!list.length) { set("gallery", empty("Noch keine Bilder in der Galerie.", "Bilder in den Ordner content/galerie hochladen und in content/galerie.json eintragen – Anleitung unten.")); $("gallery").style.columns = "auto"; return; }
-      set("gallery", list.slice().reverse().map((g, i) => `<figure data-i="${list.length - 1 - i}"><img loading="lazy" src="${esc(g.bild)}" alt="${esc(g.titel || "Screenshot")}"><figcaption><b>${esc(g.titel || "")}</b><span>${[g.von, g.datum].filter(Boolean).map(esc).join(" · ")}</span></figcaption></figure>`).join(""));
-      $("gallery").querySelectorAll("figure").forEach(f => f.onclick = () => { const g = list[f.dataset.i]; $("lbImg").src = g.bild; $("lbImg").alt = g.titel || ""; set("lbText", esc([g.titel, g.von, g.datum].filter(Boolean).join(" · "))); $("lightbox").showModal(); });
+      set("gallery", list.slice().reverse().map((g, i) => `<figure data-i="${list.length - 1 - i}"><img loading="lazy" src="${esc(g.bild)}" alt="${esc(g.titel || "Screenshot")}"><figcaption><b>${esc(g.titel || "")}</b>${g.text ? `<p class="g-text">${esc(g.text)}</p>` : ""}<span>${[g.von, g.datum].filter(Boolean).map(esc).join(" · ")}</span></figcaption></figure>`).join(""));
+      $("gallery").querySelectorAll("figure").forEach(f => f.onclick = () => { const g = list[f.dataset.i]; $("lbImg").src = g.bild; $("lbImg").alt = g.titel || ""; set("lbText", `<b>${esc(g.titel || "")}</b>${g.text ? `<br>${esc(g.text)}` : ""}<br><span class="small muted">${esc([g.von, g.datum].filter(Boolean).join(" · "))}</span>`); $("lightbox").showModal(); });
       $("lbClose").onclick = () => $("lightbox").close();
       $("lightbox").addEventListener("click", e => { if (e.target === $("lightbox")) $("lightbox").close(); });
     });

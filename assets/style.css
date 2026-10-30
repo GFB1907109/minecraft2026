@@ -583,3 +583,5 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 @keyframes lot{from{transform:rotateX(90deg);opacity:0}}
 #lotN{width:4.5rem;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.45rem .6rem}
 #bankRefill:disabled{background:rgba(255,255,255,.08);color:inherit;opacity:.8}
+
+.g-text{margin:.3rem 0 .4rem;font-size:.9rem;line-height:1.45;opacity:.85;font-weight:400}

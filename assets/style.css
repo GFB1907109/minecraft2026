@@ -587,3 +587,10 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 .g-text{margin:.3rem 0 .4rem;font-size:.9rem;line-height:1.45;opacity:.85;font-weight:400}
 
 .gal-tabs{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem}
+
+.snd{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;gap:.4rem}
+.snd button{width:46px;height:46px;border-radius:12px;border:2px solid rgba(255,255,255,.18);background:#1c1426ee;font-size:1.25rem;cursor:pointer;box-shadow:0 4px 14px #0007}
+.snd button:hover{border-color:#7bd34f}.snd button.off{opacity:.45}
+
+.snd button{width:auto;height:auto;padding:.45rem .7rem;display:flex;align-items:center;gap:.4rem;color:#f1ecf7;font:600 .85rem var(--f-body,sans-serif)}
+@media (max-width:560px){.snd button span{display:none}}

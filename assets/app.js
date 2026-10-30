@@ -835,12 +835,12 @@ function gameWheel(canvasId, btnId, outId, itemsFn, colors){
     ctx.beginPath(); ctx.arc(r, r, 18, 0, 7); ctx.fillStyle = "#1c1426"; ctx.fill();
   };
   $(btnId).onclick = () => {
-    if (spinning) return; spinning = true; $(outId).textContent = "…";
+    if (spinning) return; spinning = true; $(outId).textContent = "…"; Sound.play("spin");
     const it = itemsFn(), start = ang, target = ang + 8 * Math.PI + Math.random() * 2 * Math.PI, t0 = performance.now(), dur = 3800;
     const step = now => { const k = Math.min(1, (now - t0) / dur); ang = start + (target - start) * (1 - Math.pow(1 - k, 4)); draw();
       if (k < 1) return requestAnimationFrame(step);
       spinning = false; const n = it.length, a = ((-Math.PI / 2 - ang) % (2 * Math.PI) + 4 * Math.PI) % (2 * Math.PI);
-      $(outId).textContent = it[Math.floor(a / (2 * Math.PI / n))]; confetti(); };
+      $(outId).textContent = it[Math.floor(a / (2 * Math.PI / n))]; confetti(); Sound.play("win"); };
     requestAnimationFrame(step);
   };
   draw();
@@ -869,7 +869,7 @@ const Bank = {
     r.textContent = w > 0 ? (m => `Nachschub in ${Math.floor(m / 60)} Std. ${m % 60} Min.`)(Math.ceil(w / 6e4)) : "Nachschub holen (+30)"; }
 };
 const betOf = id => { const v = Math.floor(+$(id).value || 0); if (v < 1) { $(id).value = 1; return 1; } return v; };
-function casinoMsg(id, txt, good){ const e = $(id); e.textContent = txt; e.className = "cs-msg " + (good ? "good" : good === false ? "bad" : ""); }
+function casinoMsg(id, txt, good){ if (txt !== "…" && !/rollt|Klick auf|Karte ziehen oder/.test(txt)) Sound.play(good ? "win" : good === false ? (/💥|TNT|explod/.test(txt) ? "boom" : "lose") : "push"); const e = $(id); e.textContent = txt; e.className = "cs-msg " + (good ? "good" : good === false ? "bad" : ""); }
 function payable(bet, msgId){ if (bet > Bank.get()) { casinoMsg(msgId, "Nicht genug Diamanten!", false); return false; } return true; }
 
 const SLOT = [["dirt",1,30],["coal",2,22],["iron_ingot",3,16],["gold_ingot",5,10],["emerald",8,6],["diamond",20,4],["netherite_ingot",50,1.5],["creeper_head",0,10]];
@@ -884,7 +884,7 @@ function slotsInit(){
     if (busy) return; const bet = betOf("slotBet"); if (!payable(bet, "slotMsg")) return;
     busy = true; Bank.set(Bank.get() - bet); casinoMsg("slotMsg", "…");
     const res = [roll(), roll(), roll()];
-    reels.forEach((r, i) => { r.classList.add("spin"); const t = setInterval(() => r.innerHTML = img(rnd(SLOT)), 80);
+    reels.forEach((r, i) => { r.classList.add("spin"); const t = setInterval(() => { r.innerHTML = img(rnd(SLOT)); Sound.play("tick"); }, 80);
       setTimeout(() => { clearInterval(t); r.classList.remove("spin"); r.innerHTML = img(res[i]);
         if (i === 2) { busy = false;
           const ids = res.map(x => x[0]);
@@ -903,7 +903,7 @@ function coinInit(){
     const bet = betOf("coinBet"); if (!payable(bet, "coinMsg")) return;
     const coin = $("coin"); if (coin.classList.contains("flip")) return;
     Bank.set(Bank.get() - bet); const res = Math.random() < .5 ? "steve" : "creeper";
-    coin.className = "coin flip " + res; casinoMsg("coinMsg", "…");
+    coin.className = "coin flip " + res; casinoMsg("coinMsg", "…"); Sound.play("flip");
     setTimeout(() => { coin.className = "coin " + res;
       if (res === pick) { const w = Math.floor(bet * 1.9); Bank.set(Bank.get() + w); casinoMsg("coinMsg", `Gewonnen! +${nf.format(w)} 💎`, true); }
       else casinoMsg("coinMsg", "Verloren!", false); }, 1600);
@@ -928,7 +928,7 @@ function minesInit(){
   };
   grid.onclick = e => { const b = e.target.closest(".mc"); if (!b || !st || st.over) return; const i = +b.dataset.i;
     if (st.bombSet.has(i)) { st.over = true; st.open.add(i); casinoMsg("mMsg", "💥 TNT! Einsatz verloren.", false); }
-    else { st.open.add(i); if (st.open.size === 25 - st.bombs) { const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Alles gefunden! +${nf.format(w)} 💎`, true); confetti(); } }
+    else { st.open.add(i); Sound.play("dig"); if (st.open.size === 25 - st.bombs) { const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Alles gefunden! +${nf.format(w)} 💎`, true); confetti(); } }
     draw(); };
   $("mCash").onclick = () => { if (!st || st.over) return; const w = Math.floor(st.bet * mult(st.open.size)); Bank.set(Bank.get() + w); st.over = true; casinoMsg("mMsg", `Ausgezahlt: +${nf.format(w)} 💎`, true); draw(); };
   draw();
@@ -952,7 +952,7 @@ function rouletteInit(){
   $("rGo").onclick = () => {
     if (busy) return; const bet = betOf("rBet"); if (!payable(bet, "rMsg")) return;
     let num = null; if (choice === "num") { num = Math.floor(+$("rNum").value); if (!(num >= 0 && num <= 36)) { casinoMsg("rMsg", "Zahl zwischen 0 und 36 eingeben.", false); return; } }
-    busy = true; Bank.set(Bank.get() - bet); casinoMsg("rMsg", "Die Kugel rollt …");
+    busy = true; Bank.set(Bank.get() - bet); casinoMsg("rMsg", "Die Kugel rollt …"); Sound.play("spin");
     const idx = Math.floor(Math.random() * 37), res = WHEEL[idx], seg = 2 * Math.PI / 37;
     const want = -Math.PI / 2 - (idx + .5) * seg, start = ang, target = start + 10 * Math.PI + (((want - start) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), t0 = performance.now();
     const step = now => { const k = Math.min(1, (now - t0) / 4500); ang = start + (target - start) * (1 - Math.pow(1 - k, 4)); draw();
@@ -981,7 +981,7 @@ function bjInit(){
   const score = h => { let t = h.reduce((a, c) => a + c.r[1], 0), aces = h.filter(c => c.r[0] === "A").length; while (t > 21 && aces--) t -= 10; return t; };
   const card = (c, hide) => hide ? `<div class="card back"></div>` : `<div class="card ${c.s[0]}"><b>${c.r[0]}</b><img src="${itemImg(c.s[0])}" alt="${c.s[1]}"><b class="rot">${c.r[0]}</b></div>`;
   const show = (hideDealer) => {
-    $("bjDealer").innerHTML = dl.map((c, i) => card(c, hideDealer && i === 1)).join("");
+    Sound.play("card"); $("bjDealer").innerHTML = dl.map((c, i) => card(c, hideDealer && i === 1)).join("");
     $("bjMe").innerHTML = me.map(c => card(c)).join("");
     $("bjDs").textContent = hideDealer ? "?" : score(dl); $("bjMs").textContent = me.length ? score(me) : "";
     $("bjHit").disabled = $("bjStand").disabled = $("bjDouble").disabled = !live;
@@ -1025,6 +1025,92 @@ function casinoInit(){
   document.querySelectorAll("[data-bet]").forEach(b => b.onclick = () => { const inp = $(b.dataset.for), v = b.dataset.bet;
     inp.value = v === "max" ? Math.max(1, Bank.get()) : v === "half" ? Math.max(1, Math.floor(+inp.value / 2)) : Math.max(1, (+inp.value || 0) * 2); });
 }
+
+/* ---------- Sound (selbst erzeugt, keine Mojang-Dateien) ---------- */
+const Sound = {
+  ctx: null, master: null, musicGain: null, musicTimer: null,
+  pref(k, d){ try { const v = localStorage.getItem("mc26_snd_" + k); return v == null ? d : v === "1"; } catch { return d; } },
+  save(k, v){ try { localStorage.setItem("mc26_snd_" + k, v ? "1" : "0"); } catch {} },
+  get on(){ return this.pref("on", false); }, get music(){ return this.pref("music", false); },
+  start(){
+    if (this.ctx) { if (this.ctx.state === "suspended") this.ctx.resume(); return true; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+    this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = .5; this.master.connect(this.ctx.destination);
+    this.musicGain = this.ctx.createGain(); this.musicGain.gain.value = .22; this.musicGain.connect(this.master);
+    return true;
+  },
+  tone(f, dur, { type = "sine", vol = .3, at = 0, slide = 0, out } = {}){
+    const c = this.ctx, t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f + slide), t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(out || this.master); o.start(t); o.stop(t + dur + .05);
+  },
+  noise(dur, { vol = .3, at = 0, freq = 1200, q = .7, sweep = 0 } = {}){
+    const c = this.ctx, t = c.currentTime + at, b = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = b; f.type = "lowpass"; f.frequency.setValueAtTime(freq, t); f.Q.value = q; if (sweep) f.frequency.exponentialRampToValueAtTime(Math.max(40, freq + sweep), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t);
+  },
+  play(name){
+    if (!this.on || !this.start()) return;
+    const T = this.tone.bind(this), N = this.noise.bind(this);
+    ({
+      click(){ T(1400, .04, { type: "square", vol: .06 }); T(700, .05, { type: "triangle", vol: .08, at: .01 }); },
+      plop(){ T(380, .14, { vol: .3, slide: 520 }); },
+      levelup(){ [523, 659, 784, 1047].forEach((f, i) => T(f, .35, { type: "triangle", vol: .16, at: i * .09 })); },
+      tick(){ T(900 + Math.random() * 300, .03, { type: "square", vol: .04 }); },
+      coin(){ [988, 1319].forEach((f, i) => T(f, .25, { type: "square", vol: .07, at: i * .08 })); },
+      win(){ [784, 988, 1175, 1568, 1319, 1568].forEach((f, i) => T(f, .22, { type: "square", vol: .07, at: i * .08 })); },
+      push(){ T(440, .2, { type: "triangle", vol: .15 }); },
+      lose(){ T(392, .25, { type: "triangle", vol: .15 }); T(311, .45, { type: "triangle", vol: .15, at: .2 }); },
+      boom(){ N(1.1, { vol: .25, freq: 3000, sweep: -2600, q: 2 }); setTimeout(() => this.on && this.ctx && (N(.9, { vol: .9, freq: 900, sweep: -800 }), T(80, .6, { vol: .5, slide: -40 })), 900); },
+      card(){ N(.08, { vol: .25, freq: 4000 }); },
+      flip(){ for (let i = 0; i < 8; i++) T(1500, .03, { type: "square", vol: .04, at: i * .17 }); },
+      spin(){ for (let i = 0; i < 26; i++) T(1200, .025, { type: "square", vol: .035, at: Math.pow(i / 26, 1.8) * 4.2 }); },
+      dig(){ N(.12, { vol: .3, freq: 1500 }); }
+    })[name]?.call(this);
+  },
+  /* ruhige Klaviermusik, zufällig aus einer Tonleiter erzeugt */
+  startMusic(){
+    if (!this.music || !this.start() || this.musicTimer) return;
+    const scale = [261.6, 293.7, 329.6, 392, 440, 523.3, 587.3, 659.3, 784], bass = [130.8, 98, 110, 87.3];
+    let step = 0;
+    const piano = (f, at, vol) => { this.tone(f, 2.6, { type: "triangle", vol, at, out: this.musicGain }); this.tone(f * 2, 1.2, { type: "sine", vol: vol * .25, at, out: this.musicGain }); };
+    const bar = () => {
+      if (step % 4 === 0) piano(bass[(step / 4) % bass.length], 0, .22);
+      const n = Math.random(); if (n < .75) piano(scale[Math.floor(Math.random() * scale.length)], Math.random() * .3, .12 + Math.random() * .08);
+      if (n < .3) piano(scale[Math.floor(Math.random() * scale.length)], .9, .1);
+      step++;
+    };
+    bar(); this.musicTimer = setInterval(bar, 1800);
+  },
+  stopMusic(){ clearInterval(this.musicTimer); this.musicTimer = null; },
+  ui(){
+    const box = document.createElement("div"); box.className = "snd";
+    box.innerHTML = `<button type="button" id="sndOn" aria-label="Ton an oder aus"></button><button type="button" id="sndMusic" aria-label="Musik an oder aus"></button>`;
+    document.body.appendChild(box);
+    const draw = () => { $("sndOn").title = this.on ? "Klick- und Spiel-Töne ausschalten" : "Klick- und Spiel-Töne einschalten";
+      $("sndMusic").innerHTML = `🎵<span>${this.music ? "Musik an" : "Musik aus"}</span>`; $("sndMusic").classList.toggle("off", !this.music); $("sndMusic").title = this.music ? "Hintergrundmusik ausschalten" : "Hintergrundmusik einschalten"; $("sndOn").innerHTML = `${this.on ? "🔊" : "🔇"}<span>${this.on ? "Töne an" : "Töne aus"}</span>`; };
+    $("sndOn").onclick = () => { this.save("on", !this.on); if (this.on) { this.start(); this.play("plop"); } draw(); };
+    $("sndMusic").onclick = () => { this.save("music", !this.music); this.music ? this.startMusic() : this.stopMusic(); draw(); };
+    draw();
+    // Browser erlauben Ton erst nach dem ersten Klick
+    addEventListener("pointerdown", () => { if (this.on || this.music) { this.start(); this.startMusic(); } }, { once: true });
+    document.addEventListener("click", e => { const el = e.target.closest("a, button, .g-pl, figure, select"); if (el && !el.closest(".snd") && !el.dataset.nosnd) this.play("click"); }, true);
+    // Ereignisse: jemand kommt online, neuer Erfolg
+    let seen = null, advN = null;
+    onUpdate(() => {
+      const on = new Set(App.live?.players || []);
+      if (seen && [...on].some(n => !seen.has(n))) this.play("plop");
+      if (App.live?.checked) seen = on;
+      const a = App.stats?.adv ? Object.values(App.stats.adv).reduce((s, x) => s + Object.keys(x || {}).length, 0) : null;
+      if (advN != null && a > advN) this.play("levelup");
+      if (a != null) advN = a;
+    });
+  }
+};
 
 const PAGE_INIT = {
 
@@ -1412,6 +1498,7 @@ function countdown(d){
 /* ---------- Start ---------- */
 buildChrome();
 PAGE_INIT[document.body.dataset.page]?.();
+Sound.ui();
 loadStats();
 refreshLive();
 setInterval(refreshLive, CONFIG.refreshSeconds * 1000);

@@ -86,7 +86,8 @@ function extract(uuid, name, s) {
     coal: M("coal_ore", "deepslate_coal_ore"), logs,
     dist, walk: C("walk_one_cm") + C("sprint_one_cm"), elytra: C("aviate_one_cm"), boat: C("boat_one_cm"),
     jumps: C("jump"), fish: C("fish_caught"), bred: C("animals_bred"),
-    trades: C("traded_with_villager"), enchant: C("enchant_item")
+    trades: C("traded_with_villager"), enchant: C("enchant_item"),
+    killedBy: Object.entries(s["minecraft:killed_by"] || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => [k.replace(/^minecraft:/, ""), v])
   };
 }
 
@@ -353,7 +354,7 @@ try {
   // Deutsche Namen der Fortschritte aus der offiziellen Sprachdatei von Mojang (nur wenn nötig neu laden)
   let advNames = old?.advNames || null;
   const wantVer = worldData.version || null;
-  if (!advNames || advNames._v !== wantVer) {
+  if (!advNames || advNames._v !== wantVer || !advNames._ent) {
     try {
       const j = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status + " " + u); return r.json(); };
       const man = await j("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
@@ -362,7 +363,8 @@ try {
       const idx = await j(vj.assetIndex.url);
       const hash = idx.objects["minecraft/lang/de_de.json"].hash;
       const de = await j(`https://resources.download.minecraft.net/${hash.slice(0, 2)}/${hash}`);
-      advNames = { _v: wantVer };
+      advNames = { _v: wantVer, _ent: {} };
+      for (const [k, v] of Object.entries(de)) { const m = k.match(/^entity\.minecraft\.([a-z0-9_]+)$/); if (m) advNames._ent[m[1]] = v; }
       for (const [k, v] of Object.entries(de)) {
         const m = k.match(/^advancements\.([a-z_]+)\.([a-z0-9_.]+)\.(title|description)$/);
         if (!m) continue;
@@ -372,6 +374,13 @@ try {
       console.log(`Deutsche Fortschritt-Namen geladen (${ver.id}): ${Object.keys(advNames).length - 1}`);
     } catch (e) { console.warn("Deutsche Fortschritt-Namen nicht geladen:", e.message); }
   }
+
+  // Tages-Historie für Diagramme und Wrapped: ein Schnappschuss pro Tag (zuletzt gespeicherter Stand des Tages)
+  const HKEYS = ["play", "deaths", "mined", "mobs", "dist", "diamond", "fish", "jumps", "crafted", "bred", "debris", "pvp"];
+  const history = { ...(old?.history || {}) };
+  history[berlinDate()] = Object.fromEntries(players.map(p => [p.uuid, HKEYS.map(k => p[k] || 0)]));
+  const hDays = Object.keys(history).sort();
+  for (const d of hDays.slice(0, Math.max(0, hDays.length - 400))) delete history[d];
 
   // Aktuelle Skins direkt von Mojang (pro Spieler höchstens alle 20 Minuten neu abfragen)
   const skins = { ...(old?.skins || {}) };
@@ -391,7 +400,7 @@ try {
   // Mod-Liste
   const mods = ((await tryList(client, `${root}/mods`)) || []).filter(f => f.isFile && f.name.endsWith(".jar")).map(f => f.name).sort();
 
-  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, advNames, mods, skins };
+  const out = { players, profiles, world: worldData, log, season, seasons, week, challenges, adv, advNames, mods, skins, history, hkeys: HKEYS };
   const strip = o => JSON.stringify(o, (k, v) => k === "at" ? undefined : v);
   if (old && strip({ ...old, updated: undefined }) === strip({ ...out, updated: undefined })) {
     console.log("Keine Änderungen seit dem letzten Lauf.");

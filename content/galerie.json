@@ -3,60 +3,70 @@
     "bild": "content/galerie/polarlichter.jpg",
     "titel": "Polarlichter über der Welt",
     "text": "Die Nordlichter über unserer Welt, eines der schönsten Bilder vom Server.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/die-siedlung.jpg",
     "titel": "Die Siedlung",
     "text": "Häuser, Felder, Strand und ein Lichtermeer. In 585+ Tagen ist hier eine richtige kleine Stadt entstanden.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/blick-uebers-wasser.jpg",
     "titel": "Blick übers Wasser",
     "text": "Vom Strand aus sieht man den Turm, die Farmen und den Beacon, der jedem den Weg nach Hause zeigt.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/baumhaus-bei-nacht.jpg",
     "titel": "Baumhaus bei Nacht",
     "text": "Das Baumhaus mit Wendeltreppe ragt über alles hinaus, rechts das große beleuchtete Gebäude, links das Casino.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/spawn-bei-nacht.jpg",
     "titel": "Der Spawn bei Nacht",
     "text": "Hunderte Lichter, der Beacon-Strahl im Himmel und Polarlichter: So sieht unser Zuhause nach Sonnenuntergang aus.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/gamble-lose-drink-repeat.jpg",
     "titel": "Gamble. Lose. Drink. Repeat.",
     "text": "Das inoffizielle Motto des Servers, gut sichtbar an der Wand.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/meme-wand.jpg",
     "titel": "Die Meme-Wand",
     "text": "Kunst im Casino: Dinosaurier beim Poker, ein Hund ohne Hemd und die wichtigste Regel: Keep Gambling.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/achtung-gluecksspiel.jpg",
     "titel": "Achtung!",
     "text": "Glücksspiel kann süchtig machen. Wenigstens sind wir ehrlich und hängen das Schild direkt neben den Eingang.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/casino-bei-nacht.jpg",
     "titel": "Das Casino bei Nacht",
     "text": "Unser größtes Bauprojekt: ein Palast mit Säulen, Kuppel und Palmen. Nachts leuchtet die ganze Fassade.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   },
   {
     "bild": "content/galerie/mos-casino-schild.jpg",
     "titel": "Mo's Casino",
     "text": "Das Herz von Mo's Casino: „Gamble dich reich“. Ob das klappt? Die Statistik sagt eher nein.",
-    "datum": "30.10.2026"
+    "datum": "30.10.2026",
+    "kapitel": "Minecraft 2026"
   }
 ]

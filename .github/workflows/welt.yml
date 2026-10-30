@@ -34,12 +34,38 @@ jobs:
         run: |
           DATUM=$(TZ=Europe/Berlin date +%Y-%m-%d)
           ANZEIGE=$(TZ=Europe/Berlin date +%d.%m.%Y)
-          ZIP="Minecraft-2026-Welt-$DATUM.zip"
-          # In Teile von max. 1,9 GB aufteilen (GitHub erlaubt höchstens 2 GB pro Datei)
-          (cd download && zip -rq -s 1900m "../$ZIP" .)
-          ls -la Minecraft-2026-Welt-*
+          NAME="Minecraft-2026-Welt-$DATUM"
+          LIMIT=2080000000   # GitHub erlaubt höchstens 2 GB pro Datei
+          du -sh download
+          # 1. Versuch: eine normale ZIP mit stärkster Kompression
+          (cd download && zip -rq -9 "../$NAME.zip" .)
+          FILES="$NAME.zip"
+          if [ $(stat -c%s "$NAME.zip") -gt $LIMIT ]; then
+            # 2. Versuch: 7z packt deutlich kleiner (Windows 11 kann .7z direkt öffnen)
+            rm "$NAME.zip"
+            (cd download && 7z a -t7z -mx=9 -m0=lzma2 -md=256m -ms=on -mmt=on "../$NAME.7z" . > /dev/null)
+            FILES="$NAME.7z"
+            if [ $(stat -c%s "$NAME.7z") -gt $LIMIT ]; then
+              # 3. Notlösung: in Teile aufteilen
+              rm "$NAME.7z"
+              (cd download && 7z a -t7z -mx=9 -m0=lzma2 -md=256m -v1900m "../$NAME.7z" . > /dev/null)
+              FILES=$(ls $NAME.7z.*)
+            fi
+          fi
+          ls -la $FILES
           TAG="welt-$DATUM-$(date +%H%M)"
-          gh release create "$TAG" Minecraft-2026-Welt-$DATUM.z* --title "Welt vom $ANZEIGE" --notes "Automatische Sicherung der Welt vom $ANZEIGE." || { gh release delete "$TAG" --yes --cleanup-tag; exit 1; }
+          gh release create "$TAG" $FILES --title "Welt vom $ANZEIGE" --notes "Automatische Sicherung der Welt vom $ANZEIGE." || { gh release delete "$TAG" --yes --cleanup-tag; exit 1; }
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^welt-' | tail -n +9 | while read t; do
             gh release delete "$t" --yes --cleanup-tag
           done
+      - name: Download-Liste für die Website speichern
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases?per_page=20" > downloads.json
+          git config user.name "stats-bot"
+          git config user.email "stats-bot@users.noreply.github.com"
+          git add downloads.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Download-Liste aktualisiert"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done

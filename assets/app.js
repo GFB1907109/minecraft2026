@@ -22,7 +22,7 @@ const CONFIG = {
 // Menü: [Datei, Name, im Hauptmenü?]
 const PAGES = [
   ["index.html", "Start", 1], ["spieler.html", "Spieler", 1], ["stats.html", "Stats", 1], ["tode.html", "Tode", 1],
-  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["discord.html", "Discord", 1],
+  ["aktivitaet.html", "Aktivität", 1], ["bingo.html", "Bingo", 1], ["wrapped.html", "Wrapped", 1], ["discord.html", "Discord", 1],
   ["galerie.html", "Galerie", 0], ["projekte.html", "Projekte & Orte", 0], ["erfolge.html", "Erfolge", 0], ["archiv.html", "Archiv & Downloads", 0], ["infos.html", "Infos & Regeln", 0]
 ];
 
@@ -298,6 +298,56 @@ const advName = id => App.stats?.advNames?.[id]?.t || id.split("/").pop().split(
 const advDesc = id => App.stats?.advNames?.[id]?.d || "";
 const advCat = id => ADV_CAT[id.split("/")[0]] || id.split("/")[0];
 
+
+/* ---------- Verlauf, Erzfeind, Was-wäre-wenn ---------- */
+const ENT_FALLBACK = id => (MOB[Object.keys(MOB).find(k => k.toLowerCase().replace(/ /g, "_") === id)] || [id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())])[0];
+const entName = id => App.stats?.advNames?._ent?.[id] || ENT_FALLBACK(id);
+const hIndex = k => (App.stats?.hkeys || []).indexOf(k);
+const hDays = () => Object.keys(App.stats?.history || {}).sort();
+// Stand eines Spielers zu Beginn eines Tages (letzter Schnappschuss davor), oder null
+function valueAt(p, k, day){
+  const i = hIndex(k); if (i < 0) return null;
+  const ds = hDays().filter(d => d < day);
+  for (let j = ds.length - 1; j >= 0; j--) { const v = App.stats.history[ds[j]]?.[p.uuid]; if (v) return v[i]; }
+  return null;
+}
+function firstValue(p, k){ const i = hIndex(k); for (const d of hDays()) { const v = App.stats.history[d]?.[p.uuid]; if (v) return v[i]; } return null; }
+const monthStart = (off = 0) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + off); return ymd(d); };
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+// Zeitraum: "month" (dieser Monat), "last" (letzter Monat), "all"
+function periodRange(per){
+  if (per === "month") return { from: monthStart(0), to: null, label: MONTHS[new Date().getMonth()] };
+  if (per === "last") { const d = new Date(); d.setMonth(d.getMonth() - 1); return { from: monthStart(-1), to: monthStart(0), label: MONTHS[d.getMonth()] }; }
+  return { from: null, to: null, label: "Insgesamt" };
+}
+function periodValue(p, k, per){
+  const r = periodRange(per);
+  if (!r.from) return { v: val(p, k), partial: false };
+  const end = r.to ? valueAt(p, k, r.to) : (p[k] || 0);
+  let start = valueAt(p, k, r.from), partial = false;
+  if (start == null) { start = firstValue(p, k); partial = true; }
+  if (end == null || start == null) return { v: 0, partial: true };
+  return { v: Math.max(0, end - start), partial };
+}
+const inRange = (t, per) => { const r = periodRange(per); const d = t.slice(0, 10); return (!r.from || d >= r.from) && (!r.to || d < r.to); };
+function funFacts(T){
+  const out = [];
+  const km = T.dist / 100000, h = T.play / 72000, jumpsM = T.jumps * 1.25, blocks = T.mined;
+  if (km > 0) {
+    if (km >= 384400) out.push(["🌕", `${nf1.format(km / 384400)}× bis zum Mond`, `${N(km)} km gelaufen, geflogen und geschwommen`]);
+    else if (km >= 40075) out.push(["🌍", `${nf1.format(km / 40075)}× um die ganze Erde`, `${N(km)} km zurückgelegt`]);
+    else if (km >= 20) out.push(["🗺️", km >= 2000 ? `${nf1.format(km / 2000)}× von Bremen nach Istanbul` : `${nf.format(Math.round(km / 2000 * 100))} % der Strecke Bremen–Istanbul`, `${N(km)} km zurückgelegt (Luftlinie ca. 2.000 km)`]);
+    else out.push(["🗺️", `${nf1.format(km)} km unterwegs`, `das sind ${N(km * 1000 / 105)} Fußballfelder hintereinander`]);
+  }
+  if (h > 0) out.push(["⚽", `${N(h * 60 / 90)} Fußballspiele lang`, `${N(h)} Stunden gespielt, das sind ${nf1.format(h / 24)} Tage am Stück`]);
+  if (T.mobs > 0) out.push(["🏟️", T.mobs >= 47000 ? `${nf1.format(T.mobs / 47000)}× das Şükrü-Saracoğlu-Stadion voll` : `${nf.format(Math.round(T.mobs / 47000 * 100))} % vom Şükrü-Saracoğlu-Stadion`, `${N(T.mobs)} Mobs besiegt (Stadion: ca. 47.000 Plätze)`]);
+  if (blocks >= 250) out.push(["🏊", `${nf1.format(blocks / 2500)} Olympia-Schwimmbecken`, `${N(blocks)} Blöcke abgebaut, jeder Block ist 1 m³`]);
+  if (jumpsM > 0) out.push(["🗼", jumpsM >= 8849 ? `${nf1.format(jumpsM / 8849)}× auf den Mount Everest` : `${nf1.format(jumpsM / 330)}× auf den Eiffelturm`, `${N(T.jumps)} Sprünge à 1,25 m`]);
+  if (T.deaths > 0) out.push(["💀", `${N(T.deaths)} Leben verbraucht`, T.deaths >= 100 ? "Mehr als 100 Mal neu gespawnt" : "und trotzdem immer weitergemacht"]);
+  if (T.fish > 0) out.push(["🐟", `${N(T.fish)} Fische geangelt`, `genug für ${N(T.fish * 2)} Portionen Fischbrötchen`]);
+  return out;
+}
+
 /* ---------- Gemeinsame Bausteine ---------- */
 function tilesHtml(){
   const L = App.live, has = players().length;
@@ -502,6 +552,52 @@ function boardInto(){
       <div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="bar"><i style="width:${Math.max(2, v/top*100)}%"></i></div></div><span class="val">${s.fmt(v)}</span></a>`; }).join("");
 }
 
+
+/* Verlaufs-Diagramm (SVG) */
+const LINE_COLORS = ["#6fbf3f", "#f2c14e", "#5a9bff", "#ef5b5b", "#c58bff", "#3fd3c8", "#ff9f43", "#e0e0e0"];
+const CH_METRICS = [["play", "Spielzeit", v => v / 72000, "h"], ["mined", "Blöcke abgebaut", v => v, ""], ["mobs", "Mobs getötet", v => v, ""], ["deaths", "Tode", v => v, ""], ["dist", "Strecke", v => v / 100000, "km"], ["diamond", "Diamanterz", v => v, ""]];
+let chMetric = "play", chMode = "day";
+function chartInto(){
+  const box = $("chart"); if (!box) return;
+  const days = hDays().slice(-30);
+  set("chMetric", CH_METRICS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")); $("chMetric").value = chMetric;
+  $("chMetric").onchange = e => { chMetric = e.target.value; chartInto(); };
+  set("chMode", [["day", "Pro Tag"], ["sum", "Insgesamt"]].map(([k, l]) => `<button type="button" data-m="${k}" aria-pressed="${k === chMode}">${l}</button>`).join(""));
+  $("chMode").querySelectorAll("button").forEach(b => b.onclick = () => { chMode = b.dataset.m; chartInto(); });
+  if (days.length < 2) { box.innerHTML = empty("Das Diagramm füllt sich ab morgen.", "Jeden Tag wird ein Stand gespeichert. Ab dem zweiten Tag siehst du hier den Verlauf."); set("chLegend", ""); return; }
+  const [key, , conv, unit] = CH_METRICS.find(m => m[0] === chMetric), i = hIndex(key);
+  const allDays = hDays(), series = players().map((p, n) => {
+    const pts = days.map(d => { const v = App.stats.history[d]?.[p.uuid]; if (!v) return null;
+      if (chMode === "sum") return conv(v[i]);
+      const prevDay = allDays[allDays.indexOf(d) - 1], pv = prevDay && App.stats.history[prevDay]?.[p.uuid];
+      return pv ? Math.max(0, conv(v[i] - pv[i])) : null; });
+    return { p, pts, color: LINE_COLORS[n % LINE_COLORS.length] };
+  }).filter(s => s.pts.some(v => v != null && v > 0));
+  const W = 800, Hh = 300, L = 54, R = 16, T = 14, B = 34;
+  const maxV = Math.max(1, ...series.flatMap(s => s.pts.filter(v => v != null)));
+  const nice = (() => { const m = Math.pow(10, Math.floor(Math.log10(maxV))); return Math.ceil(maxV / m) * m; })();
+  const x = j => L + (W - L - R) * (j / (days.length - 1)), y = v => T + (Hh - T - B) * (1 - v / nice);
+  const fmt = v => (v >= 100 ? N(v) : nf1.format(v)) + (unit ? " " + unit : "");
+  let g = "";
+  for (let k = 0; k <= 4; k++) { const v = nice * k / 4; g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmt(v)}</text>`; }
+  const step = Math.max(1, Math.ceil(days.length / 8));
+  days.forEach((d, j) => { if ((j % step === 0 && days.length - 1 - j >= step / 2) || j === days.length - 1) g += `<text x="${x(j)}" y="${Hh - 10}" text-anchor="middle" font-size="11" fill="var(--muted)">${d.slice(8, 10)}.${d.slice(5, 7)}.</text>`; });
+  for (const s of series) {
+    const segs = []; let cur = [];
+    s.pts.forEach((v, j) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(`${x(j).toFixed(1)},${y(v).toFixed(1)}`); });
+    if (cur.length) segs.push(cur);
+    g += segs.map(c => `<polyline points="${c.join(" ")}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`).join("");
+    const lastJ = s.pts.map((v, j) => v != null ? j : -1).filter(j => j >= 0).pop();
+    if (lastJ != null) g += `<circle cx="${x(lastJ)}" cy="${y(s.pts[lastJ])}" r="4" fill="${s.color}"><title>${esc(s.p.name)}: ${fmt(s.pts[lastJ])}</title></circle>`;
+  }
+  box.innerHTML = `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Verlauf ${esc(chMetric)}" style="width:100%;min-width:520px;height:auto;display:block">${g}</svg></div>`;
+  set("chLegend", series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.p.name)}</span>`).join("") || `<span class="muted">Noch keine Werte in diesem Zeitraum.</span>`);
+}
+function factsInto(id){
+  const T = { dist: sum("dist"), play: sum("play"), jumps: sum("jumps"), mined: sum("mined"), mobs: sum("mobs"), deaths: sum("deaths"), fish: sum("fish") };
+  set(id, players().length ? funFacts(T).map(f => `<div class="fact"><b>${esc(f[1])}</b><span>${esc(f[2])}</span></div>`).join("") : empty("Kommt mit dem nächsten Abgleich."));
+}
+
 /* Inventar */
 const ITEM_ALIAS = { cooked_beef: "Steak", beef: "Raw_Beef", porkchop: "Raw_Porkchop", chicken: "Raw_Chicken", mutton: "Raw_Mutton", rabbit: "Raw_Rabbit", cod: "Raw_Cod", salmon: "Raw_Salmon" };
 const itemTitle = id => id.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join("_");
@@ -685,6 +781,8 @@ const PAGE_INIT = {
         set("pEnder", `<div class="inv">${invGrid(pr.ender, range(0,27))}</div>`);
       } else { set("pVitals", `<p class="muted small">Noch keine Spielerdaten.</p>`); set("pInv", ""); set("pEnder", ""); }
       deathFeedInto("pDeaths", 8, real);
+      const kb = p.killedBy || [];
+      set("pNemesis", kb.length ? `<div class="nemesis"><span class="eyebrow" style="color:var(--red)">Erzfeind</span><b>${esc(entName(kb[0][0]))}</b><span class="muted">hat ${esc(real)} ${kb[0][1]}-mal getötet</span></div>${kb.length > 1 ? `<div class="small muted" style="margin-top:8px">Danach: ${kb.slice(1).map(([k, n]) => `${esc(entName(k))} (${n}×)`).join(", ")}</div>` : ""}` : `<p class="muted small" style="margin:0">Noch kein Erzfeind. Glückwunsch!</p>`);
       const ss = sessions().filter(s => s.p === real).slice(-8).reverse();
       set("pSessions", ss.length ? ss.map(s => `<div class="fi" style="grid-template-columns:minmax(0,1fr) auto"><span class="tx">${when(s.from)} – ${s.to ? s.to.slice(11,16) : "jetzt"}</span><span class="tm">${dur(sessionEnd(s) - toDate(s.from))}</span></div>`).join("") : `<p class="muted small">Noch keine Sessions in den Logs.</p>`);
       set("pStats", GROUPS.map(g => `<div><h4>${g}</h4><div class="kv">` + STATS.filter(s => s.g === g).map(s => { const r = rankOf(p, s.key);
@@ -700,7 +798,7 @@ const PAGE_INIT = {
     onUpdate(() => {
       const d = App.stats?.updated ? new Date(App.stats.updated) : null;
       set("statsInfo", players().length ? `Stand: ${d ? d.toLocaleString("de-DE",{dateStyle:"medium",timeStyle:"short"}) : "unbekannt"}. Klick auf einen Spieler für sein Profil.` : "Noch keine Welt-Stats geladen.");
-      boardTabs(); boardInto(); recordsInto("records");
+      boardTabs(); boardInto(); recordsInto("records"); chartInto(); factsInto("facts");
       // Vergleich
       const a = $("cmpA"), b = $("cmpB"), ps = [...players()].sort((x,y) => x.name.localeCompare(y.name));
       if (ps.length < 2) { set("cmp", empty("Für den Vergleich braucht es mindestens zwei Spieler.")); return; }
@@ -742,6 +840,68 @@ const PAGE_INIT = {
       mapInto("map", { places });
       set("legend", `<span><i class="phead" style="width:16px!important;height:16px!important;display:inline-block;border-width:1px"></i>Spieler</span><span><i class="spawnmark" style="display:inline-block;width:10px!important;height:10px!important"></i>Spawn</span><span><i class="pin" style="display:inline-block;background:#f2c14e"></i>Projekt im Bau</span><span><i class="pin" style="display:inline-block;background:#6fbf3f"></i>Projekt fertig</span><span><i class="pin" style="display:inline-block;background:#5a7bd8"></i>Ort</span>`);
     });
+  },
+
+  wrapped(){
+    let per = "month", idx = 0, who = null;
+    const COLORS = ["#3f7a22,#6fbf3f", "#2c2a6b,#7b5cff", "#7a2f1d,#ef7a3b", "#1d4d6b,#3fb5ef", "#5c1d4d,#e05ca8", "#6b5a1d,#f2c14e", "#1d6b5a,#3fd3a8", "#40304f,#a68bd1", "#3f7a22,#f2c14e"];
+    function persona(p){
+      const t = k => periodValue(p, k, per).v;
+      const all = players(), max = k => Math.max(1, ...all.map(x => periodValue(x, k, per).v));
+      const score = [["Der Bergarbeiter", "gräbt sich durch die Welt wie kein anderer", t("mined") / max("mined")], ["Der Krieger", "kein Mob ist vor dir sicher", t("mobs") / max("mobs")],
+        ["Der Entdecker", "immer unterwegs, nie zu Hause", t("dist") / max("dist")], ["Der Pechvogel", "der Boden war oft schneller als du", t("deaths") / max("deaths")],
+        ["Der Angler", "die Fische kennen deinen Namen", t("fish") / max("fish")], ["Der Bauer", "deine Tiere sind dein Ein und Alles", t("bred") / max("bred")]];
+      return score.sort((a, b) => b[2] - a[2])[0];
+    }
+    function slides(){
+      const p = players().find(x => x.uuid === who); if (!p) return [];
+      const r = periodRange(per), V = k => periodValue(p, k, per);
+      const play = V("play"), partial = play.partial && per !== "all";
+      const rank = k => [...players()].sort((a, b) => periodValue(b, k, per).v - periodValue(a, k, per).v).indexOf(p) + 1;
+      const ss = sessions().filter(x => x.p === p.name && inRange(x.from, per)).map(x => ({ ...x, ms: sessionEnd(x) - toDate(x.from) }));
+      const longest = ss.sort((a, b) => b.ms - a.ms)[0];
+      const hours = new Array(24).fill(0); ss.forEach(x => hours[+x.from.slice(11, 13)]++);
+      const favH = ss.length ? hours.indexOf(Math.max(...hours)) : null;
+      const chats = App.events.filter(e => e[1] === "c" && e[2] === p.name && inRange(e[0], per)).length;
+      const ds = deaths().filter(d => d.p === p.name && inRange(d.t, per));
+      const adv = advDone(p).filter(([, t]) => t && inRange(t, per));
+      const nem = p.killedBy?.[0];
+      const ff = funFacts({ dist: V("dist").v, play: play.v, jumps: V("jumps").v, mined: V("mined").v, mobs: V("mobs").v, deaths: V("deaths").v, fish: V("fish").v });
+      const big = (n, unit) => `<div class="w-big">${n}<span>${unit || ""}</span></div>`;
+      const out = [];
+      out.push(`<span class="w-eyebrow">Minecraft 2026 · Wrapped</span><h2 class="w-title">${esc(p.name)}<br>${per === "all" ? "insgesamt" : "im " + esc(r.label)}</h2><img class="w-skin" alt="" src="${body(p.name)}"><p>${partial ? "Seit Beginn der Aufzeichnung" : "Dein Rückblick"} – klick dich durch.</p>`);
+      out.push(`<span class="w-eyebrow">Spielzeit</span>${big(nf1.format(play.v / 72000), " Stunden")}<p>Damit bist du <b>Platz ${rank("play")}</b> von ${players().length} auf dem Server.</p>${play.v > 0 ? `<p class="w-small">Das sind ${N(play.v / 72000 * 60 / 90)} Fußballspiele hintereinander.</p>` : ""}`);
+      if (longest) out.push(`<span class="w-eyebrow">Am Stück</span>${big(dur(longest.ms))}<p>Deine längste Session, am ${dayLabel(longest.from.slice(0, 10))} ab ${longest.from.slice(11, 16)} Uhr.</p>${favH != null ? `<p class="w-small">Am liebsten spielst du gegen <b>${String(favH).padStart(2, "0")}:00 Uhr</b>.</p>` : ""}`);
+      out.push(`<span class="w-eyebrow">Bergbau</span>${big(N(V("mined").v), " Blöcke")}<p><b>${N(V("diamond").v)}</b> Diamanterz und <b>${N(V("debris").v)}</b> Antiker Schutt.</p><p class="w-small">Platz ${rank("mined")} beim Abbauen.</p>`);
+      out.push(`<span class="w-eyebrow">Kampf</span>${big(N(V("mobs").v), " Mobs")}<p>Dafür bist du <b>${N(V("deaths").v)}-mal</b> gestorben.</p>${nem ? `<p class="w-small">Dein Erzfeind: <b>${esc(entName(nem[0]))}</b> – hat dich insgesamt ${nem[1]}-mal erwischt.</p>` : ""}${ds.length ? `<p class="w-small">Letzter Tod: ${esc(ds[ds.length - 1].de)}.</p>` : ""}`);
+      if (ff.length) out.push(`<span class="w-eyebrow">Was wäre wenn …</span><div class="w-facts">${ff.slice(0, 3).map(f => `<div><b>${esc(f[1])}</b><span>${esc(f[2])}</span></div>`).join("")}</div>`);
+      out.push(`<span class="w-eyebrow">Fortschritte</span>${big(adv.length, adv.length === 1 ? " Fortschritt" : " Fortschritte")}<p>${adv.length ? adv.slice(-3).reverse().map(([id]) => `<b>${esc(advName(id))}</b>`).join(", ") : "In diesem Zeitraum kein neuer Fortschritt."}</p>${chats ? `<p class="w-small">Und du hast <b>${chats}</b> Nachrichten in den Chat geschrieben.</p>` : ""}`);
+      const pr = persona(p);
+      out.push(`<span class="w-eyebrow">Dein Typ</span><h2 class="w-title">${esc(pr[0])}</h2><p>… ${esc(pr[1])}.</p><img class="w-skin" alt="" src="${body(p.name)}"><p class="w-small">Bis zum nächsten Rückblick!</p>`);
+      return out;
+    }
+    function draw(){
+      const sel = $("wPlayer");
+      if (!players().length) { set("wCard", empty("Wrapped startet mit dem nächsten Abgleich.")); return; }
+      const sorted = [...players()].sort((a, b) => a.name.localeCompare(b.name));
+      if (!who || !players().some(p => p.uuid === who)) who = (players().find(p => isOnline(p.name)) || sorted[0]).uuid;
+      sel.innerHTML = sorted.map(p => `<option value="${esc(p.uuid)}">${esc(p.name)}</option>`).join(""); sel.value = who;
+      set("wPer", [["month", "Dieser Monat"], ["last", "Letzter Monat"], ["all", "Insgesamt"]].map(([k, l]) => `<button type="button" data-p="${k}" aria-pressed="${k === per}">${l}</button>`).join(""));
+      $("wPer").querySelectorAll("button").forEach(b => b.onclick = () => { per = b.dataset.p; idx = 0; draw(); });
+      const sl = slides(); idx = Math.max(0, Math.min(idx, sl.length - 1));
+      const c = COLORS[idx % COLORS.length].split(",");
+      const card = $("wCard");
+      card.style.background = `linear-gradient(150deg, ${c[0]}, ${c[1]})`;
+      card.innerHTML = `<div class="w-inner">${sl[idx]}</div>`;
+      set("wDots", sl.map((_, i) => `<i class="${i === idx ? "on" : ""}"></i>`).join(""));
+      $("wPrev").disabled = idx === 0; $("wNext").textContent = idx === sl.length - 1 ? "Nochmal" : "Weiter →";
+    }
+    const go = d => { const n = slides().length; idx = d > 0 && idx === n - 1 ? 0 : Math.max(0, idx + d); draw(); };
+    $("wPlayer").addEventListener("change", e => { who = e.target.value; idx = 0; draw(); });
+    $("wPrev").onclick = () => go(-1); $("wNext").onclick = () => go(1);
+    $("wCard").addEventListener("click", e => { const r = $("wCard").getBoundingClientRect(); go(e.clientX - r.left > r.width / 3 ? 1 : -1); });
+    document.addEventListener("keydown", e => { if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); });
+    onUpdate(draw);
   },
 
   bingo(){ $("bingoPlayer").addEventListener("change", bingoInto); onUpdate(bingoInto); },

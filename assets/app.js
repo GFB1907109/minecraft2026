@@ -1255,8 +1255,17 @@ const PAGE_INIT = {
   galerie(){
     loadContent("galerie").then(list => {
       if (!list.length) { set("gallery", empty("Noch keine Bilder in der Galerie.", "Bilder in den Ordner content/galerie hochladen und in content/galerie.json eintragen – Anleitung unten.")); $("gallery").style.columns = "auto"; return; }
-      set("gallery", list.slice().reverse().map((g, i) => `<figure data-i="${list.length - 1 - i}"><img loading="lazy" src="${esc(g.bild)}" alt="${esc(g.titel || "Screenshot")}"><figcaption><b>${esc(g.titel || "")}</b>${g.text ? `<p class="g-text">${esc(g.text)}</p>` : ""}<span>${[g.von, g.datum].filter(Boolean).map(esc).join(" · ")}</span></figcaption></figure>`).join(""));
-      $("gallery").querySelectorAll("figure").forEach(f => f.onclick = () => { const g = list[f.dataset.i]; $("lbImg").src = g.bild; $("lbImg").alt = g.titel || ""; set("lbText", `<b>${esc(g.titel || "")}</b>${g.text ? `<br>${esc(g.text)}` : ""}<br><span class="small muted">${esc([g.von, g.datum].filter(Boolean).join(" · "))}</span>`); $("lightbox").showModal(); });
+      const chaps = [...new Set(list.map(g => g.kapitel || "Minecraft 2026"))].sort().reverse();
+      let cur = chaps[0];
+      const tabs = $("galTabs") || (() => { const d = document.createElement("div"); d.id = "galTabs"; d.className = "gal-tabs"; $("gallery").before(d); return d; })();
+      const render = () => {
+        tabs.innerHTML = chaps.map(c => `<button type="button" class="g-btn ${c === cur ? "" : "ghost"}" data-c="${esc(c)}">${esc(c)} <span class="small">(${list.filter(g => (g.kapitel || "Minecraft 2026") === c).length})</span></button>`).join("");
+        tabs.querySelectorAll("[data-c]").forEach(b => b.onclick = () => { cur = b.dataset.c; render(); });
+        const idx = list.map((g, i) => [g, i]).filter(([g]) => (g.kapitel || "Minecraft 2026") === cur).reverse();
+        set("gallery", idx.map(([g, i]) => `<figure data-i="${i}"><img loading="lazy" src="${esc(g.bild)}" alt="${esc(g.titel || "Screenshot")}"><figcaption><b>${esc(g.titel || "")}</b>${g.text ? `<p class="g-text">${esc(g.text)}</p>` : ""}<span>${[g.von, g.datum].filter(Boolean).map(esc).join(" · ")}</span></figcaption></figure>`).join(""));
+        $("gallery").querySelectorAll("figure").forEach(f => f.onclick = () => { const g = list[f.dataset.i]; $("lbImg").src = g.bild; $("lbImg").alt = g.titel || ""; set("lbText", `<b>${esc(g.titel || "")}</b>${g.text ? `<br>${esc(g.text)}` : ""}<br><span class="small muted">${esc([g.kapitel, g.von, g.datum].filter(Boolean).join(" · "))}</span>`); $("lightbox").showModal(); });
+      };
+      render();
       $("lbClose").onclick = () => $("lightbox").close();
       $("lightbox").addEventListener("click", e => { if (e.target === $("lightbox")) $("lightbox").close(); });
     });

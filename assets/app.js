@@ -656,24 +656,25 @@ function mapMarkers(){
 /* Downloads */
 async function downloadsInto(id){
   const box = $(id); if (!box) return;
-  try {
-    const r = await fetch(`https://api.github.com/repos/${CONFIG.github}/releases?per_page=20`);
-    if (!r.ok) throw 0;
-    const rel = (await r.json()).filter(x => !x.draft && x.assets?.some(a => a.name.endsWith(".zip")));
-    if (!rel.length) { box.innerHTML = empty("Noch keine Welt hochgeladen.", "Die erste Sicherung erscheint hier automatisch am Sonntag."); return; }
-    box.innerHTML = rel.map((x, i) => {
-      const fmt = n => { const mb = n / 1048576; return mb >= 1024 ? nf1.format(mb / 1024) + " GB" : nf.format(Math.round(mb)) + " MB"; };
-      // Teile sortieren: .z01, .z02, … und zuletzt .zip
-      const parts = x.assets.filter(a => /\.(zip|z\d+)$/.test(a.name)).sort((a, b) => (a.name.endsWith(".zip") - b.name.endsWith(".zip")) || a.name.localeCompare(b.name));
-      const size = parts.reduce((s, a) => s + a.size, 0);
-      const dl = Math.max(...parts.map(a => a.download_count));
-      const multi = parts.length > 1;
-      return `<div class="dl-item${i === 0 ? " latest" : ""}"><span class="ico" aria-hidden="true"></span><div style="min-width:0"><h3>${esc(x.name || x.tag_name)}${i === 0 ? '<span class="tag">Neueste</span>' : ""}</h3>
-        <div class="meta">${new Date(x.published_at || x.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })} · ${fmt(size)} · ${nf.format(dl)}× geladen${multi ? ` · ${parts.length} Teile` : ""}</div>
-        ${multi ? `<p class="small muted" style="margin:6px 0 0">Alle Teile in denselben Ordner laden, dann die <code>.zip</code>-Datei mit 7-Zip oder WinRAR entpacken.</p>` : ""}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">${parts.map((a, k) => `<a class="btn" href="${esc(a.browser_download_url)}">${multi ? `Teil ${k + 1} (${fmt(a.size)})` : "Welt herunterladen"}</a>`).join("")}</div></div>`;
-    }).join("");
-  } catch { box.innerHTML = empty("Downloads gerade nicht erreichbar.", "Bitte die Seite in ein paar Minuten neu laden."); }
+  const get = async u => { const r = await fetch(u, { cache: "no-cache" }); if (!r.ok) throw 0; return r.json(); };
+  let list = null;
+  try { list = await get("downloads.json?" + Date.now()); } catch {}
+  if (!Array.isArray(list)) try { list = await get(`https://api.github.com/repos/${CONFIG.github}/releases?per_page=20`); } catch {}
+  if (!Array.isArray(list)) { box.innerHTML = empty("Downloads gerade nicht erreichbar.", `Du findest alle Sicherungen auch direkt hier: <a href="https://github.com/${CONFIG.github}/releases">GitHub-Downloads</a>`); return; }
+  const isPart = n => /\.(zip|z\d+|7z|7z\.\d+)$/.test(n);
+  const rel = list.filter(x => !x.draft && x.assets?.some(a => isPart(a.name)));
+  if (!rel.length) { box.innerHTML = empty("Noch keine Welt hochgeladen.", "Die erste Sicherung erscheint hier automatisch am Sonntag."); return; }
+  const fmt = n => { const mb = n / 1048576; return mb >= 1024 ? nf1.format(mb / 1024) + " GB" : nf.format(Math.round(mb)) + " MB"; };
+  box.innerHTML = rel.map((x, i) => {
+    const parts = x.assets.filter(a => isPart(a.name)).sort((a, b) => (a.name.endsWith(".zip") - b.name.endsWith(".zip")) || a.name.localeCompare(b.name));
+    const size = parts.reduce((s, a) => s + a.size, 0), dl = Math.max(...parts.map(a => a.download_count || 0)), multi = parts.length > 1;
+    const sevenZ = parts.some(a => /\.7z/.test(a.name));
+    const hint = multi ? `Alle Teile in denselben Ordner laden, dann den ersten Teil mit 7-Zip entpacken.` : sevenZ ? `Eine <code>.7z</code>-Datei: Unter Windows 11 Rechtsklick → „Alle extrahieren“, sonst mit 7-Zip.` : "";
+    return `<div class="dl-item${i === 0 ? " latest" : ""}"${i > 2 ? ' style="display:none" data-old' : ""}><span class="ico" aria-hidden="true"></span><div style="min-width:0"><h3>${esc(x.name || x.tag_name)}${i === 0 ? '<span class="tag">Neueste</span>' : ""}</h3>
+      <div class="meta">${new Date(x.published_at || x.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })} · ${fmt(size)} · ${nf.format(dl)}× geladen${multi ? ` · ${parts.length} Teile` : ""}</div>
+      ${hint ? `<p class="small muted" style="margin:6px 0 0">${hint}</p>` : ""}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">${parts.map((a, k) => `<a class="btn" href="${esc(a.browser_download_url)}">${multi ? `Teil ${k + 1} (${fmt(a.size)})` : "Welt herunterladen"}</a>`).join("")}</div></div>`;
+  }).join("") + (rel.length > 3 ? `<button type="button" class="g-btn ghost" onclick="this.remove();document.querySelectorAll('[data-old]').forEach(e=>e.style.display='')">Ältere Sicherungen zeigen</button>` : "");
 }
 
 /* Sternenhimmel (Startseite) */

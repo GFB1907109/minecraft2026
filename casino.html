@@ -16,10 +16,18 @@
 <a class="skip" href="#inhalt">Zum Inhalt</a>
 <header class="top" id="top"></header>
 <main id="inhalt">
-<section class="page-head"><div class="wrap"><span class="eyebrow">Casino</span><h1>Das Diamanten-Casino</h1><p class="lead">Nur zum Spaß: Hier wird mit Spiel-Diamanten gezockt, nicht mit echten Items oder echtem Geld. Jeder startet mit 100.</p></div></section>
+<section class="page-head"><div class="wrap"><span class="eyebrow">Casino</span><h1>Das Diamanten-Casino</h1><p class="lead">Nur zum Spaß: Hier wird mit Spiel-Diamanten gezockt, nicht mit echten Items oder echtem Geld. Jeder startet mit 100. Wer pleite ist, bekommt nur einmal am Tag 30 Diamanten Nachschub, also gut aufpassen!</p></div></section>
 <section class="block-sec"><div class="wrap">
-<div class="bank"><span class="bank-big"><img src="https://minecraft.wiki/w/Special:FilePath/Invicon_Diamond.png" alt=""><span class="bank-v">100</span> Diamanten</span><button type="button" class="g-btn" id="bankRefill" hidden>Neu aufladen (100)</button></div>
+<div class="bank"><span class="bank-big"><img src="https://minecraft.wiki/w/Special:FilePath/Invicon_Diamond.png" alt=""><span class="bank-v">100</span> Diamanten</span><button type="button" class="g-btn" id="bankRefill" hidden>Nachschub holen (+30)</button></div>
 <div class="casino">
+  <div class="panel game luck"><h2>Glücksrad &amp; Lose</h2><p class="small muted">Wenn ihr euch nicht einigen könnt: Trag Namen oder Sachen ein (eine pro Zeile), dann dreh das Rad oder zieh Lose für eine Reihenfolge.</p>
+    <div class="luck-grid">
+      <div><label class="small muted" for="luckList">Was steht zur Wahl?</label><textarea id="luckList" spellcheck="false"></textarea>
+        <div class="presets"><button type="button" class="g-btn ghost" data-preset="spieler">Alle Spieler</button><button type="button" class="g-btn ghost" data-preset="Nether|End|Mine|Bauen|Farmen|Erkunden">Was machen wir?</button><button type="button" class="g-btn ghost" data-preset="Ja|Nein">Ja / Nein</button><button type="button" class="g-btn ghost" data-preset="Holz farmen|Essen besorgen|Lager aufräumen|Mob-Farm bauen|Diamanten suchen|Straße bauen">Aufgaben</button></div>
+        <div class="cs-bet"><label class="small muted" for="lotN">Lose ziehen</label><input type="number" id="lotN" min="1" value="1"><button type="button" class="g-btn" id="lotGo">Lose ziehen</button></div>
+        <div class="lots" id="lotList"></div></div>
+      <div class="center"><div class="wheel"><canvas id="luckWheel" width="640" height="640"></canvas></div><p class="wheel-out" id="luckOut"></p><button type="button" class="g-btn" id="luckGo">Rad drehen!</button></div>
+    </div></div>
   <div class="panel game"><h2>Redstone-Roulette</h2><p class="small muted">Redstone ist Rot, Kohle ist Schwarz, Smaragd ist die 0. Eine Farbe zahlt das Doppelte, eine genaue Zahl das 36-fache.</p>
     <div class="r-wrap"><canvas id="rWheel" width="600" height="600"></canvas></div>
     <div class="r-bets"><button type="button" class="g-btn r-red on" data-r="red">Redstone</button><button type="button" class="g-btn r-black" data-r="black">Kohle</button><button type="button" class="g-btn r-green" data-r="green">Smaragd 0</button><button type="button" class="g-btn ghost" data-r="odd">Ungerade</button><button type="button" class="g-btn ghost" data-r="even">Gerade</button><button type="button" class="g-btn ghost" data-r="low">1–18</button><button type="button" class="g-btn ghost" data-r="high">19–36</button><input type="number" min="0" max="36" id="rNum" placeholder="Zahl" aria-label="Genaue Zahl"></div>

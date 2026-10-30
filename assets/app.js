@@ -1090,7 +1090,8 @@ const Sound = {
   },
   /* ruhige Klaviermusik, zufällig aus einer Tonleiter erzeugt */
   startMusic(){
-    if (!this.music || !this.start() || this.musicTimer) return;
+    if (!this.music) return;
+    if (!this.start() || this.musicTimer) return;
     const scale = [261.6, 293.7, 329.6, 392, 440, 523.3, 587.3, 659.3, 784], bass = [130.8, 98, 110, 87.3];
     let step = 0;
     const piano = (f, at, vol) => { this.tone(f, 2.6, { type: "triangle", vol, at, out: this.musicGain }); this.tone(f * 2, 1.2, { type: "sine", vol: vol * .25, at, out: this.musicGain }); };
@@ -1511,9 +1512,104 @@ function countdown(d){
   return `noch ${t ? t + " T " : ""}${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 }
 
+/* ---------- Klick-Effekt: Block-Partikel wie beim Abbauen ---------- */
+(() => {
+  const BLOCKS = [["#6d9b3a","#5a7f2f","#86603f"],["#7d7d7d","#9a9a9a","#5f5f5f"],["#62ede4","#3fc9c0","#e6fffd"],["#f5c542","#d9a72b","#fff1a8"],["#b3261e","#e2557b","#7a140f"],["#a3743f","#c9914a","#7a5025"]];
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let last = 0;
+  document.addEventListener("pointerdown", e => {
+    if (reduce || e.button > 0 || e.target.closest("input, textarea, select, canvas") || Date.now() - last < 60) return; last = Date.now();
+    const pal = rnd(BLOCKS), n = 9 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement("i"); d.className = "mcpart";
+      const sz = 5 + Math.random() * 6, ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 70;
+      d.style.cssText = `left:${e.clientX - sz / 2}px;top:${e.clientY - sz / 2}px;width:${sz}px;height:${sz}px;background:${rnd(pal)};--x:${Math.cos(ang) * sp}px;--y:${Math.sin(ang) * sp - 40}px;--r:${(Math.random() - .5) * 540}deg`;
+      document.body.appendChild(d); setTimeout(() => d.remove(), 700);
+    }
+    if (Math.random() < .35) { const o = document.createElement("i"); o.className = "xporb"; o.style.cssText = `left:${e.clientX - 6}px;top:${e.clientY - 6}px`; document.body.appendChild(o); setTimeout(() => o.remove(), 900); }
+  }, { passive: true });
+})();
+
+/* ---------- Server-Bot (beantwortet Fragen aus den Server-Daten) ---------- */
+const Bot = (() => {
+  const KW = [[/spielzeit|gespielt|stunden|zeit online|aktivst/, "play"], [/tod|tode|gestorben|stirbt|sterben/, "deaths"], [/diamant/, "diamond"], [/abgebaut|blöcke|bloecke|gemined|mine[nd]/, "mined"],
+    [/mobs?|monster|getötet|getoetet|kills?/, "mobs"], [/pvp|spieler getötet/, "pvp"], [/creeper/, "creeper"], [/zombie/, "zombie"], [/enderm/, "enderman"], [/drache/, "dragon"], [/wither/, "wither"],
+    [/schutt|netherit|debris/, "debris"], [/eisen/, "iron"], [/gold/, "gold"], [/kohle/, "coal"], [/holz|stämme|baum/, "logs"], [/gelaufen|strecke|km|gereist/, "dist"], [/elytra|geflogen/, "elytra"],
+    [/boot/, "boat"], [/spr(u|ü)ng/, "jumps"], [/fisch|geangelt/, "fish"], [/gezüchtet|zücht|tiere/, "bred"], [/gehandelt|handel|villager|dorfbew/, "trades"], [/verzauber/, "enchant"],
+    [/geschlafen|bett|schlaf/, "sleep"], [/truhe|kiste/, "chests"], [/hergestellt|gecraftet|craft/, "crafted"], [/schaden/, "dealt"], [/k\/?d|kills pro tod/, "kd"]];
+  const norm = t => t.toLowerCase().replace(/[?!.,]/g, " ");
+  const findPlayer = q => players().map(p => p.name).sort((a, b) => b.length - a.length).find(n => q.includes(n.toLowerCase())) ||
+    players().map(p => p.name).find(n => n.length > 4 && q.includes(n.toLowerCase().slice(0, 5)));
+  const statOf = q => { for (const [re, k] of KW) if (re.test(q)) return STATS.find(s => s.key === k); return null; };
+  const link = (n) => `<a href="${plink(n)}">${esc(n)}</a>`;
+  function answer(raw){
+    const q = norm(raw), S = App.stats, L = App.live;
+    if (!q.trim()) return "Frag mich was über den Server 🙂";
+    if (/^(hi|hallo|hey|moin|servus|yo|selam|merhaba)\b/.test(q)) return `Hey! Ich bin der Server-Bot von ${esc(CONFIG.name)}. Frag mich zum Beispiel „Wer hat die meisten Tode?“ oder „Wie lange hat ${esc(players()[0]?.name || "Steve")} gespielt?“`;
+    if (/hilfe|help|was kannst|befehle/.test(q)) return "Ich kenne die Server-Daten. Frag zum Beispiel:<br>• Wer ist online?<br>• Wer hat die meisten Diamanten?<br>• Wie viele Tode hat <i>Name</i>?<br>• Wer war zuletzt online?<br>• Wie ist die IP?<br>• Wie ist der letzte Tod passiert?<br>• Infos über <i>Name</i>";
+    if (/\bip\b|adresse|beitreten|joinen|verbinden/.test(q)) return `Die Adresse ist <b>${esc(addr)}</b>. Version ${esc(CONFIG.software)} ${esc(CONFIG.version)}.`;
+    if (/version|fabric|mods?\b/.test(q) && !findPlayer(q)) return `Wir spielen ${esc(CONFIG.software)} ${esc(CONFIG.version)}${S?.mods?.length ? ` mit ${S.mods.length} Mods` : ""}.`;
+    if (/discord/.test(q)) return CONFIG.discord?.invite ? `Hier geht's zum Discord: <a href="${esc(CONFIG.discord.invite)}" target="_blank" rel="noopener">${esc(CONFIG.discord.invite)}</a>` : "Discord ist noch nicht eingetragen.";
+    if (/online|wer spielt|gerade (da|drauf)/.test(q) && !/zuletzt|letzte/.test(q)) {
+      if (!L.checked) return "Ich prüfe den Server gerade, frag gleich nochmal.";
+      if (!L.online) return "Der Server ist gerade offline.";
+      return L.players?.length ? `Gerade online (${L.players.length}/${L.max}): ${L.players.map(link).join(", ")}` : "Gerade ist niemand online.";
+    }
+    if (!S) return "Die Daten laden noch, einen Moment …";
+    if (/zuletzt|letzte[rn]? online|wann war/.test(q)) {
+      const ls = lastSeen(), p = findPlayer(q);
+      if (p) return ls[p] ? `${link(p)} war zuletzt ${when(ls[p])} da.` : `Zu ${link(p)} habe ich noch keine Zeit gespeichert.`;
+      const top = Object.entries(ls).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 3);
+      return top.length ? "Zuletzt da:<br>" + top.map(([n, t]) => `• ${link(n)}: ${when(t)}`).join("<br>") : "Noch keine Daten.";
+    }
+    if (/letzte[rn]? tod|zuletzt gestorben|wie .* gestorben/.test(q)) {
+      const p = findPlayer(q), d = deaths().filter(x => !p || x.p === p).pop();
+      return d ? `${link(d.p)} ${esc(d.de)} (${when(d.t)}).` : "Noch keine Tode gespeichert. 🎉";
+    }
+    if (/welt|seed|tag \d|wie alt|schwierigkeit/.test(q)) { const w = S.world || {}; return `Die Welt${w.day ? ` ist bei Tag ${nf.format(w.day)}` : ""}${w.difficulty ? `, Schwierigkeit ${esc(w.difficulty)}` : ""}.`; }
+    if (/casino|glücksrad|lose/.test(q)) return `Im <a href="casino.html">Casino</a> gibt es Glücksrad, Lose, Roulette, Creeper 21, Slots und Münzwurf.`;
+    if (/bingo|challenge/.test(q)) return `Das <a href="bingo.html">Wochen-Bingo</a> hat jede Woche neue Aufgaben.`;
+    const st = statOf(q), p = findPlayer(q);
+    if (p) {
+      const pl = players().find(x => x.name === p);
+      if (st) { const rank = players().slice().sort((a, b) => val(b, st.key) - val(a, st.key)).findIndex(x => x.name === p) + 1;
+        return `${link(p)} – ${esc(st.label)}: <b>${st.fmt(val(pl, st.key))}</b> (Platz ${rank} von ${players().length}).`; }
+      return `<b>${link(p)}</b><br>• Spielzeit: ${H(val(pl, "play"))}<br>• Tode: ${nf.format(val(pl, "deaths"))}<br>• Mobs getötet: ${nf.format(val(pl, "mobs"))}<br>• Diamanterz: ${nf.format(val(pl, "diamond"))}<br>• Strecke: ${STATS.find(s => s.key === "dist").fmt(val(pl, "dist"))}`;
+    }
+    if (st) {
+      const low = /wenigste|am seltensten|niedrig/.test(q);
+      const list = players().slice().sort((a, b) => low ? val(a, st.key) - val(b, st.key) : val(b, st.key) - val(a, st.key)).slice(0, 3);
+      return `${low ? "Am wenigsten" : "Am meisten"} ${esc(st.label)}:<br>` + list.map((x, i) => `${["🥇","🥈","🥉"][i]} ${link(x.name)}: <b>${st.fmt(val(x, st.key))}</b>`).join("<br>");
+    }
+    if (/wie viele spieler|anzahl spieler|wer spielt (hier|mit)/.test(q)) return `Auf dem Server spielen ${players().length} Leute: ${players().map(x => link(x.name)).join(", ")}.`;
+    if (/danke|thx|merci/.test(q)) return "Gern! 💎";
+    return "Das weiß ich leider nicht. Ich kenne nur die Server-Daten. Schreib <b>Hilfe</b>, dann zeige ich dir Beispiele.";
+  }
+  function ui(){
+    const box = document.createElement("div"); box.className = "bot";
+    box.innerHTML = `<button type="button" class="bot-fab" id="botFab" aria-label="Server-Bot öffnen">🤖</button>
+      <div class="bot-win" id="botWin" hidden><div class="bot-head"><span>🤖 Server-Bot</span><button type="button" id="botX" aria-label="Schließen">✕</button></div>
+      <div class="bot-log" id="botLog"></div>
+      <div class="bot-chips">${["Wer ist online?","Meiste Tode?","Meiste Spielzeit?","Wer war zuletzt da?","IP?"].map(t => `<button type="button" data-q="${t}">${t}</button>`).join("")}</div>
+      <form class="bot-in" id="botForm"><input id="botQ" autocomplete="off" placeholder="Frag mich was …" aria-label="Frage"><button type="submit">➤</button></form></div>`;
+    document.body.appendChild(box);
+    const log = $("botLog");
+    const add = (html, me) => { log.insertAdjacentHTML("beforeend", `<div class="msg ${me ? "me" : "bot"}">${html}</div>`); log.scrollTop = log.scrollHeight; };
+    const ask = t => { add(esc(t), true); const typing = document.createElement("div"); typing.className = "msg bot typing"; typing.innerHTML = "<i></i><i></i><i></i>"; log.appendChild(typing); log.scrollTop = log.scrollHeight;
+      setTimeout(() => { typing.remove(); add(answer(t)); Sound.play("plop"); }, 450 + Math.random() * 400); };
+    $("botFab").onclick = () => { const w = $("botWin"); w.hidden = !w.hidden; if (!w.hidden) { if (!log.children.length) add(answer("hallo")); $("botQ").focus(); } };
+    $("botX").onclick = () => $("botWin").hidden = true;
+    $("botForm").onsubmit = e => { e.preventDefault(); const t = $("botQ").value.trim(); if (!t) return; $("botQ").value = ""; ask(t); };
+    box.querySelectorAll("[data-q]").forEach(b => b.onclick = () => ask(b.dataset.q));
+  }
+  return { answer, ui };
+})();
+
+
 /* ---------- Start ---------- */
 buildChrome();
 Sound.ui();
+Bot.ui();
 const BASE_SUBS = App.subs.slice();
 PAGE_INIT[document.body.dataset.page]?.();
 

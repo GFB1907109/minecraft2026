@@ -703,3 +703,29 @@ footer p a{display:inline-block;margin:0 14px 4px 0!important}
 .ticket.open .t-front{visibility:visible;transition:visibility 0s .3s}
 .ticket.open .t-back{visibility:hidden;transition:visibility 0s .3s}
 #losList{display:block;width:100%;min-height:180px;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.6rem .8rem;resize:vertical}
+
+.mcpart{position:fixed;z-index:9999;pointer-events:none;image-rendering:pixelated;box-shadow:inset -1px -1px 0 #0004;animation:mcpart .65s cubic-bezier(.2,.6,.4,1) forwards}
+@keyframes mcpart{60%{opacity:1}to{transform:translate(var(--x),calc(var(--y) + 90px)) rotate(var(--r));opacity:0}}
+.xporb{position:fixed;z-index:9999;pointer-events:none;width:12px;height:12px;border-radius:3px;background:radial-gradient(circle,#f4ff8a,#7bd34f 60%,#3d7a1f);box-shadow:0 0 10px #c6ff5a;animation:xporb .9s ease-out forwards}
+@keyframes xporb{30%{transform:translateY(-34px) scale(1.2)}to{transform:translateY(-70px) scale(.5);opacity:0}}
+
+/* Server-Bot */
+.bot-fab{position:fixed;left:16px;bottom:16px;z-index:60;width:56px;height:56px;border-radius:16px;border:2px solid #7bd34f;background:#1c1426;font-size:1.7rem;cursor:pointer;box-shadow:0 6px 20px #0008;animation:botbob 3s ease-in-out infinite}
+@keyframes botbob{50%{transform:translateY(-4px)}}
+.bot-win{position:fixed;left:16px;bottom:84px;z-index:60;width:min(360px,calc(100vw - 32px));height:min(480px,calc(100vh - 120px));display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:#1c1426;border:2px solid rgba(255,255,255,.15);box-shadow:0 18px 40px #000b;animation:gameIn .3s ease}
+.bot-win[hidden]{display:none}
+.bot-head{display:flex;justify-content:space-between;align-items:center;padding:.7rem .9rem;background:linear-gradient(90deg,#3d7a1f,#2a1f3a);font-weight:700}
+.bot-head button{background:none;border:0;color:inherit;font-size:1.1rem;cursor:pointer}
+.bot-log{flex:1;overflow-y:auto;padding:.8rem;display:flex;flex-direction:column;gap:.5rem}
+.msg{max-width:85%;padding:.55rem .8rem;border-radius:12px;line-height:1.45;font-size:.92rem;overflow-wrap:anywhere}
+.msg.bot{background:rgba(255,255,255,.07);align-self:flex-start;border-bottom-left-radius:4px}
+.msg.me{background:#7bd34f;color:#10200a;align-self:flex-end;border-bottom-right-radius:4px}
+.msg a{color:#7bd34f}
+.typing{display:flex;gap:4px}.typing i{width:7px;height:7px;border-radius:50%;background:#fff8;animation:typ 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes typ{50%{transform:translateY(-4px);opacity:.4}}
+.bot-chips{display:flex;gap:.35rem;overflow-x:auto;padding:.4rem .6rem}
+.bot-chips button{flex:none;font:500 .78rem inherit;font-family:inherit;color:inherit;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:.3rem .65rem;cursor:pointer}
+.bot-in{display:flex;gap:.4rem;padding:.6rem;border-top:1px solid rgba(255,255,255,.1)}
+.bot-in input{flex:1;min-width:0;font:inherit;color:inherit;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.55rem .7rem}
+.bot-in button{border:0;border-radius:10px;background:#7bd34f;color:#10200a;font-weight:700;padding:0 .9rem;cursor:pointer}
+.bot-log .msg{display:block;grid-template-columns:none}.bot-log .msg.typing{display:flex}

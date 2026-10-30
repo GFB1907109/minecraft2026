@@ -87,6 +87,10 @@ function extract(uuid, name, s) {
     dist, walk: C("walk_one_cm") + C("sprint_one_cm"), elytra: C("aviate_one_cm"), boat: C("boat_one_cm"),
     jumps: C("jump"), fish: C("fish_caught"), bred: C("animals_bred"),
     trades: C("traded_with_villager"), enchant: C("enchant_item"),
+    horse: C("horse_one_cm"), pig: C("pig_one_cm"), strider: C("strider_one_cm"), ghast: C("happy_ghast_one_cm"),
+    animalKills: ["cow","pig","sheep","chicken","rabbit","mooshroom","goat"].reduce((a, k) => a + K(k), 0),
+    leads: (s["minecraft:used"] || {})["minecraft:lead"] || 0, sheared: (s["minecraft:used"] || {})["minecraft:shears"] || 0,
+    eggs: (s["minecraft:used"] || {})["minecraft:egg"] || 0, bones: (s["minecraft:used"] || {})["minecraft:bone_meal"] || 0,
     killedBy: Object.entries(s["minecraft:killed_by"] || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => [k.replace(/^minecraft:/, ""), v])
   };
 }
@@ -354,7 +358,7 @@ try {
   // Deutsche Namen der Fortschritte aus der offiziellen Sprachdatei von Mojang (nur wenn nötig neu laden)
   let advNames = old?.advNames || null;
   const wantVer = worldData.version || null;
-  if (!advNames || advNames._v !== wantVer || !advNames._ent) {
+  if (!advNames || advNames._v !== wantVer || !advNames._ent || !advNames._item) {
     try {
       const j = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status + " " + u); return r.json(); };
       const man = await j("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
@@ -363,7 +367,8 @@ try {
       const idx = await j(vj.assetIndex.url);
       const hash = idx.objects["minecraft/lang/de_de.json"].hash;
       const de = await j(`https://resources.download.minecraft.net/${hash.slice(0, 2)}/${hash}`);
-      advNames = { _v: wantVer, _ent: {} };
+      advNames = { _v: wantVer, _ent: {}, _item: {} };
+      for (const [k, v] of Object.entries(de)) { const m = k.match(/^(?:item|block)\.minecraft\.([a-z0-9_]+)$/); if (m && !advNames._item[m[1]]) advNames._item[m[1]] = v; }
       for (const [k, v] of Object.entries(de)) { const m = k.match(/^entity\.minecraft\.([a-z0-9_]+)$/); if (m) advNames._ent[m[1]] = v; }
       for (const [k, v] of Object.entries(de)) {
         const m = k.match(/^advancements\.([a-z_]+)\.([a-z0-9_.]+)\.(title|description)$/);
@@ -371,7 +376,7 @@ try {
         const id = `${m[1]}/${m[2].replace(/\./g, "/")}`;
         (advNames[id] ||= {})[m[3] === "title" ? "t" : "d"] = v;
       }
-      console.log(`Deutsche Fortschritt-Namen geladen (${ver.id}): ${Object.keys(advNames).length - 1}`);
+      console.log(`Deutsche Fortschritt-Namen geladen (${ver.id}): ${Object.keys(advNames).length - 3}, Items: ${Object.keys(advNames._item).length}`);
     } catch (e) { console.warn("Deutsche Fortschritt-Namen nicht geladen:", e.message); }
   }
 
